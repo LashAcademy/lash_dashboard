@@ -12,7 +12,11 @@ document.addEventListener('DOMContentLoaded', () => {
     navLinks.forEach(l => l.classList.remove('active'));
     sections.forEach(s => s.classList.remove('active'));
 
-    document.getElementById(moduleId).classList.add('active');
+    const targetSection = document.getElementById(moduleId);
+    if (targetSection) {
+      targetSection.classList.add('active');
+    }
+
     const navLink = document.querySelector(`.nav-link[data-module="${moduleId}"]`);
     if (navLink) navLink.classList.add('active');
 
