@@ -9,6 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let workflows = JSON.parse(localStorage.getItem('lash_workflows') || JSON.stringify(defaultWorkflows));
   let students = JSON.parse(localStorage.getItem('lash_students') || '[]');
   let settings = JSON.parse(localStorage.getItem('lash_academy_settings') || '{}');
+  let selectedChatImage = null; // State for pending chat image
 
   const PROVIDED_N8N_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzYzk3MmE4Zi1jMWI3LTQwMDEtYTM3OC0zNTQ5ZTEyNmMzZDEiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwianRpIjoiYmUxMTBkOWUtNmZiZi00NGVkLWEzYWUtYWMwYTM3OGE1NGE4IiwiaWF0IjoxNzczMzE4Mjc4fQ.SWoFVnUlwqLp04pViVk7-LToSNaIq7fhvfyP7w-c9Pg";
 
@@ -351,35 +352,77 @@ document.addEventListener('DOMContentLoaded', () => {
     alert('Canal añadido con éxito');
   };
 
+  // --- IMAGE HANDLING ---
+  const chatImageInput = document.getElementById('chat-image-input');
+  const triggerImageUpload = document.getElementById('trigger-image-upload');
+  const imagePreviewArea = document.getElementById('chat-image-preview');
+
+  if (triggerImageUpload) triggerImageUpload.addEventListener('click', () => chatImageInput.click());
+
+  if (chatImageInput) {
+    chatImageInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          selectedChatImage = event.target.result; // Base64
+          imagePreviewArea.innerHTML = `<img src="${selectedChatImage}" class="preview-thumb"> <button class="btn-icon" onclick="clearSelectedImage()">&times;</button>`;
+          imagePreviewArea.style.display = 'flex';
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+  }
+
+  window.clearSelectedImage = () => {
+    selectedChatImage = null;
+    imagePreviewArea.style.display = 'none';
+    chatImageInput.value = '';
+  };
+
   const sendChatBtn = document.getElementById('send-chat');
   if (sendChatBtn) {
     sendChatBtn.addEventListener('click', async () => {
       const input = document.getElementById('chat-input');
       const text = input.value;
       const url = document.getElementById('chat-workflow-select').value;
-      if (!text || !url) return;
+      if ((!text && !selectedChatImage) || !url) return;
 
       const chatBox = document.getElementById('chat-messages');
       const userMsg = document.createElement('div');
       userMsg.className = 'chat-msg user';
-      userMsg.textContent = text;
+
+      // Show text + image in UI
+      if (selectedChatImage) {
+        userMsg.innerHTML = `<img src="${selectedChatImage}" class="chat-img"><br>${text}`;
+      } else {
+        userMsg.textContent = text;
+      }
+
       chatBox.appendChild(userMsg);
+      const currentMsg = text;
+      const currentImg = selectedChatImage;
+
       input.value = '';
+      clearSelectedImage();
       chatBox.scrollTop = chatBox.scrollHeight;
 
       try {
-        // n8n Chat Trigger expects "chatInput"
         const res = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ chatInput: text, message: text, sender: 'Lash-Dashboard' })
+          body: JSON.stringify({
+            chatInput: currentMsg,
+            message: currentMsg,
+            sender: 'Lash-Dashboard',
+            filedata: currentImg // Sending base64 if present
+          })
         });
 
         if (res.ok) {
           const data = await res.json();
           const aiMsg = document.createElement('div');
           aiMsg.className = 'chat-msg n8n';
-          // n8n Chat Trigger usually returns the text directly or in a field
           aiMsg.textContent = data.output || data.response || data.text || (typeof data === 'string' ? data : 'Mensaje enviado.');
           chatBox.appendChild(aiMsg);
           chatBox.scrollTop = chatBox.scrollHeight;

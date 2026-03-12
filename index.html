@@ -204,6 +204,9 @@
               <div class="chat-msg system">Dashboard: Sistema listo. Selecciona un workflow para iniciar el chat.</div>
             </div>
             <div class="chat-input-area">
+              <div id="chat-image-preview" class="image-preview-container" style="display: none;">
+                <!-- Preview thumb will go here -->
+              </div>
               <div style="display: flex; gap: 5px; width: 100%;">
                 <select id="chat-workflow-select" class="chat-select" style="flex: 1;">
                   <option value="">Seleccionar Canal...</option>
@@ -212,6 +215,9 @@
                     class="fa-solid fa-plus"></i></button>
               </div>
               <div style="display: flex; gap: 10px; width: 100%; margin-top: 10px;">
+                <input type="file" id="chat-image-input" accept="image/*" hidden>
+                <button id="trigger-image-upload" class="btn-secondary" title="Subir Imagen"><i
+                    class="fa-solid fa-paperclip"></i></button>
                 <input type="text" id="chat-input" placeholder="Escribe un mensaje para n8n..." style="flex: 1;">
                 <button id="send-chat" class="btn-primary"><i class="fa-solid fa-paper-plane"></i></button>
               </div>
