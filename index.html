@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lash Academy | Business Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Playfair+Display:wght@700&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+
+<body>
+  <div id="app">
+    <aside class="sidebar">
+      <div class="logo-container">
+        <h1>Lash Academy</h1>
+        <p style="font-size: 0.7rem; color: var(--primary-gold); letter-spacing: 3px; margin-top: 4px;">MARBELLA</p>
+      </div>
+
+      <ul class="nav-links">
+        <li class="nav-item">
+          <a class="nav-link active" data-module="dashboard">
+            <i class="fa-solid fa-house"></i> Overview
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" data-module="workflows">
+            <i class="fa-solid fa-diagram-project"></i> n8n Workflows
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" data-module="shopify">
+            <i class="fa-brands fa-shopify"></i> Shopify Store
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" data-module="clients">
+            <i class="fa-solid fa-users"></i> Clients DB
+          </a>
+        </li>
+      </ul>
+
+      <div class="sidebar-footer">
+        <a class="nav-link" data-module="settings">
+          <i class="fa-solid fa-gear"></i> Connections
+        </a>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <!-- Overview Module -->
+      <section id="dashboard" class="module-section active">
+        <div class="header-action">
+          <h2>Business Overview</h2>
+          <div class="status-indicator" id="global-status">
+            <span class="dot"></span> Connected
+          </div>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-card">
+            <h3>Total Sales (Monthly)</h3>
+            <div class="value">€12,450.00</div>
+            <div class="change positive"><i class="fa-solid fa-arrow-up"></i> 12% vs last month</div>
+          </div>
+          <div class="stat-card">
+            <h3>Active Workflows</h3>
+            <div class="value" id="active-workflows-count">0</div>
+            <div class="change">Automating your academy</div>
+          </div>
+          <div class="stat-card">
+            <h3>Academy Students</h3>
+            <div class="value">342</div>
+            <div class="change positive"><i class="fa-solid fa-plus"></i> 8 new this week</div>
+          </div>
+        </div>
+
+        <div class="card-large">
+          <h3 style="margin-bottom: 1.5rem;">Recent Activity</h3>
+          <div id="activity-list">
+            <!-- Dynamic content -->
+            <p style="color: var(--text-secondary);">Connect your APIs to see real-time activity.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Workflows Module -->
+      <section id="workflows" class="module-section">
+        <div class="header-action">
+          <h2>n8n Workflows</h2>
+          <button class="btn-primary" id="refresh-workflows">Refresh List</button>
+        </div>
+        <div class="wf-grid" id="workflow-list-container">
+          <!-- Mock/Dynamic list -->
+        </div>
+      </section>
+
+      <!-- Settings Module -->
+      <section id="settings" class="module-section">
+        <div class="header-action">
+          <h2>API Connections</h2>
+        </div>
+        <div class="glass-card" style="max-width: 600px;">
+          <p style="margin-bottom: 2rem; color: var(--text-secondary);">Las llaves API se guardan localmente en tu
+            navegador. Nosotros no tenemos acceso a ellas.</p>
+
+          <div class="input-group">
+            <label>n8n API URL</label>
+            <input type="text" id="n8n-url" placeholder="https://tu-n8n.com/api/v1">
+          </div>
+          <div class="input-group">
+            <label>n8n API Key</label>
+            <input type="password" id="n8n-key" placeholder="n8n_api_...">
+          </div>
+          <div class="input-group">
+            <label>Shopify Store URL</label>
+            <input type="text" id="shopify-url" placeholder="tienda.myshopify.com">
+          </div>
+          <div class="input-group">
+            <label>Shopify Access Token</label>
+            <input type="password" id="shopify-token" placeholder="shpat_...">
+          </div>
+
+          <button class="btn-primary" id="save-settings">Save Connections</button>
+        </div>
+      </section>
+
+      <!-- Placeholder Modules -->
+      <section id="shopify" class="module-section">
+        <h2>Shopify Management</h2>
+        <p>Connect Shopify API in settings to manage your shop.</p>
+      </section>
+      <section id="clients" class="module-section">
+        <h2>Clients Database</h2>
+        <p>Academic database management module coming soon.</p>
+      </section>
+    </main>
+  </div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+
+</html>
