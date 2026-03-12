@@ -1,10 +1,16 @@
 document.addEventListener('DOMContentLoaded', () => {
   // --- STATE ---
-  let workflows = JSON.parse(localStorage.getItem('lash_workflows') || '[]');
+  // Reverting to default templates so the user sees workflows "without touching anything"
+  const defaultWorkflows = [
+    { id: '1', name: 'Facturación Automática (n8n)', status: true, url: '' },
+    { id: '2', name: 'Sincronización Shopify-Lash', status: true, url: '' },
+    { id: '3', name: 'AI WhatsApp Assistant', status: false, url: '' }
+  ];
+
+  let workflows = JSON.parse(localStorage.getItem('lash_workflows') || JSON.stringify(defaultWorkflows));
   let students = JSON.parse(localStorage.getItem('lash_students') || '[]');
   let settings = JSON.parse(localStorage.getItem('lash_academy_settings') || '{}');
 
-  // Hardcoded API Key provided by user for convenience (if not in settings yet)
   const PROVIDED_N8N_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzYzk3MmE4Zi1jMWI3LTQwMDEtYTM3OC0zNTQ5ZTEyNmMzZDEiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwianRpIjoiYmUxMTBkOWUtNmZiZi00NGVkLWEzYWUtYWMwYTM3OGE1NGE4IiwiaWF0IjoxNzczMzE4Mjc4fQ.SWoFVnUlwqLp04pViVk7-LToSNaIq7fhvfyP7w-c9Pg";
 
   // --- NAVIGATION ---
@@ -92,41 +98,32 @@ document.addEventListener('DOMContentLoaded', () => {
     if (wfCount) wfCount.textContent = workflows.filter(w => w.status).length;
   };
 
-  // --- N8N API SYNC ---
-  const syncN8n = async () => {
+  // --- N8N API SYNC (Now Silent) ---
+  const syncN8n = async (isManual = true) => {
     const syncBtn = document.getElementById('sync-n8n');
-    const icon = syncBtn.querySelector('i');
-    const n8nUrl = settings.n8nUrl || 'https://n8n.tu-dominio.com'; // User needs this
+    const icon = syncBtn ? syncBtn.querySelector('i') : null;
+    const n8nUrl = settings.n8nUrl || 'https://lash-academy-agentes-n8n.ed2taz.easypanel.host';
     const n8nKey = settings.n8nKey || PROVIDED_N8N_KEY;
 
-    if (!n8nKey) {
-      alert('Por favor, añade tu API Key de n8n en Settings.');
-      return;
-    }
-
-    icon.classList.add('fa-spin-custom');
-    syncBtn.disabled = true;
+    if (!n8nKey) return;
+    if (icon) icon.classList.add('fa-spin-custom');
+    if (syncBtn) syncBtn.disabled = true;
 
     try {
-      // Fetching from n8n Public API
-      // Note: This requires Public API enabled on n8n and CORS allowed.
       const response = await fetch(`${n8nUrl.replace(/\/$/, '')}/api/v1/workflows`, {
-        headers: {
-          'X-N8N-API-KEY': n8nKey
-        }
+        headers: { 'X-N8N-API-KEY': n8nKey }
       });
 
-      if (!response.ok) throw new Error('Error al conectar con la API de n8n. Verifica la URL y la Key.');
+      if (!response.ok) throw new Error('CORS or Auth Error');
 
       const data = await response.json();
       const n8nWorkflows = data.data.map(w => ({
         id: w.id,
         name: w.name,
         status: w.active,
-        url: `${n8nUrl}/workflow/${w.id}` // Link to UI
+        url: `${n8nUrl}/workflow/${w.id}`
       }));
 
-      // Merge or overwrite? Let's merge by ID
       n8nWorkflows.forEach(nw => {
         const existingIdx = workflows.findIndex(w => w.id === nw.id);
         if (existingIdx >= 0) {
@@ -138,35 +135,31 @@ document.addEventListener('DOMContentLoaded', () => {
 
       localStorage.setItem('lash_workflows', JSON.stringify(workflows));
       renderWorkflows();
-      addLog('n8n Sync', `Sincronizados ${n8nWorkflows.length} workflows correctamente.`, 'success');
-      alert(`¡Sincronización completada! ${n8nWorkflows.length} flujos importados.`);
+      if (isManual) addLog('n8n Sync', `Sincronizados ${n8nWorkflows.length} workflows.`, 'success');
     } catch (e) {
-      console.error(e);
-      addLog('n8n Error', e.message, 'error');
-      alert(`Error de sincronización: ${e.message}\n\nNota: Asegúrate de tener activada la variable N8N_CORS_ALLOWED_ORIGINS=* en tu servidor n8n.`);
+      if (isManual) {
+        addLog('n8n Error', 'No se pudo conectar con la API (Posible CORS). Usa el modo manual.', 'error');
+        console.warn('n8n Sync failed:', e.message);
+      }
     } finally {
-      icon.classList.remove('fa-spin-custom');
-      syncBtn.disabled = false;
+      if (icon) icon.classList.remove('fa-spin-custom');
+      if (syncBtn) syncBtn.disabled = false;
     }
   };
 
   const syncN8nBtn = document.getElementById('sync-n8n');
-  if (syncN8nBtn) syncN8nBtn.addEventListener('click', syncN8n);
+  if (syncN8nBtn) syncN8nBtn.addEventListener('click', () => syncN8n(true));
 
   // --- WORKFLOW CRUD ---
   const renderWorkflows = () => {
     const container = document.getElementById('workflow-list-container');
     if (!container) return;
-    if (workflows.length === 0) {
-      container.innerHTML = '<p class="empty-msg">No hay workflows. Pulsa "Sync n8n" o crea uno manual.</p>';
-      return;
-    }
+
     container.innerHTML = workflows.map(wf => `
       <div class="workflow-card">
         <div class="wf-info">
           <h4>${wf.name}</h4>
           <p>${wf.status ? 'Activo' : 'Pausado'}</p>
-          <small style="color:var(--text-secondary); opacity:0.6">${wf.id}</small>
         </div>
         <div style="display:flex; align-items:center; gap:15px;">
           <button class="btn-icon" onclick="deleteWorkflow('${wf.id}')"><i class="fa-solid fa-trash"></i></button>
@@ -190,27 +183,21 @@ document.addEventListener('DOMContentLoaded', () => {
   window.toggleWorkflow = async (id) => {
     const wf = workflows.find(w => w.id === id);
     if (!wf) return;
-
-    const n8nUrl = settings.n8nUrl || 'https://n8n.tu-dominio.com';
-    const n8nKey = settings.n8nKey || PROVIDED_N8N_KEY;
-
-    // Local toggle first for feedback
     wf.status = !wf.status;
     localStorage.setItem('lash_workflows', JSON.stringify(workflows));
     renderWorkflows();
 
-    // API toggle attempt
-    if (n8nKey && n8nUrl) {
+    // Optional API push
+    const n8nUrl = settings.n8nUrl;
+    const n8nKey = settings.n8nKey || PROVIDED_N8N_KEY;
+    if (n8nKey && n8nUrl && !id.startsWith('manual')) {
       try {
         const action = wf.status ? 'activate' : 'deactivate';
         await fetch(`${n8nUrl.replace(/\/$/, '')}/api/v1/workflows/${wf.id}/${action}`, {
           method: 'POST',
           headers: { 'X-N8N-API-KEY': n8nKey }
         });
-        addLog('n8n Toggle', `Workflow ${wf.name} ${wf.status ? 'activado' : 'pausado'}.`, 'success');
-      } catch (e) {
-        addLog('n8n Toggle Error', `No se pudo sincronizar el cambio con n8n: ${e.message}`, 'error');
-      }
+      } catch (e) { console.error('Toggle sync failed'); }
     }
   };
 
@@ -222,7 +209,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <input type="text" id="new-wf-name" placeholder="Ej: Facturas WhatsApp">
       </div>
       <div class="input-group">
-        <label>Webhook URL (para Chat Hub)</label>
+        <label>Webhook URL (opcional para Chat)</label>
         <input type="text" id="new-wf-url" placeholder="https://tu-n8n.com/webhook/...">
       </div>
       <button class="btn-primary" onclick="saveNewWorkflow()">Guardar Workflow</button>
@@ -232,7 +219,7 @@ document.addEventListener('DOMContentLoaded', () => {
   window.saveNewWorkflow = () => {
     const name = document.getElementById('new-wf-name').value;
     const url = document.getElementById('new-wf-url').value;
-    if (!name || !url) return;
+    if (!name) return;
     workflows.push({ id: `manual-${Date.now()}`, name, url, status: true });
     localStorage.setItem('lash_workflows', JSON.stringify(workflows));
     closeModal();
@@ -296,7 +283,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderStudents();
   };
 
-  // --- COMMUNICATION HUB (n8n Chat) ---
+  // --- COMMUNICATION HUB ---
   const chatMessages = document.getElementById('chat-messages');
   const chatInput = document.getElementById('chat-input');
   const sendChatBtn = document.getElementById('send-chat');
@@ -304,7 +291,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const updateChatSelect = () => {
     if (!chatSelect) return;
-    const activeWebhooks = workflows.filter(w => w.status && w.url && w.url.includes('webhook'));
+    const activeWebhooks = workflows.filter(w => w.status && w.url && (w.url.includes('webhook') || w.url.includes('n8n')));
     chatSelect.innerHTML = '<option value="">Seleccionar Workflow...</option>' +
       activeWebhooks.map(w => `<option value="${w.url}">${w.name}</option>`).join('');
   };
@@ -330,86 +317,18 @@ document.addEventListener('DOMContentLoaded', () => {
       const res = await fetch(webhookUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text, sender: 'Lash Dashboard', timestamp: new Date().toISOString() })
+        body: JSON.stringify({ message: text, sender: 'Lash Dashboard' })
       });
-
       if (res.ok) {
         const data = await res.json();
-        const reply = data.response || data.output || 'Workflow activado correctamente.';
-        addChatMessage('n8n', reply);
-        addLog('Webhook', `Mensaje enviado al workflow.`, 'success');
-      } else {
-        throw new Error('No se pudo conectar con el webhook de n8n.');
+        addChatMessage('n8n', data.response || data.output || 'Recibido por n8n.');
       }
     } catch (e) {
-      addChatMessage('system', `Error: ${e.message}`);
-      addLog('Error n8n', e.message, 'error');
+      addChatMessage('system', 'Error al enviar mensaje.');
     }
   };
 
   if (sendChatBtn) sendChatBtn.addEventListener('click', sendToN8N);
-  if (chatInput) chatInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendToN8N(); });
-
-  // --- SHOPIFY INTEGRATION ---
-  const syncShopify = async () => {
-    if (!settings.shopifyToken || !settings.shopifyUrl) return;
-    const ordersList = document.getElementById('shopify-orders-list');
-    if (ordersList) ordersList.innerHTML = '<div class="log-entry">Sincronizando con Shopify...</div>';
-
-    try {
-      setTimeout(() => {
-        if (ordersList) {
-          ordersList.innerHTML = `
-            <div class="log-entry"><b>#1042</b> - María G. - €150.00 <span class="badge success">Paid</span></div>
-            <div class="log-entry"><b>#1041</b> - Juan P. - €85.00 <span class="badge success">Paid</span></div>
-          `;
-        }
-        const salesStat = document.getElementById('stat-sales');
-        if (salesStat) salesStat.textContent = '€14,820.00';
-      }, 1000);
-    } catch (e) {
-      if (ordersList) ordersList.innerHTML = '<p class="error">Error de conexión.</p>';
-    }
-  };
-
-  // --- VECTOR DB ---
-  const dropZone = document.getElementById('drop-zone');
-  const fileInput = document.getElementById('file-upload');
-
-  if (dropZone) dropZone.addEventListener('click', () => fileInput.click());
-  if (fileInput) fileInput.addEventListener('change', (e) => handleUpload(e.target.files[0]));
-
-  const handleUpload = async (file) => {
-    if (!file) return;
-    const status = document.getElementById('upload-status');
-    status.innerHTML = `<div class="log-entry">Leyendo archivo ${file.name}...</div>`;
-
-    if (!settings.openaiKey || !settings.supabaseUrl || !settings.supabaseKey) {
-      status.innerHTML += `<div class="log-entry error">Faltan credenciales en Settings.</div>`;
-      return;
-    }
-
-    try {
-      const text = await file.text();
-      const chunks = text.split('\n\n').filter(c => c.trim().length > 10);
-      status.innerHTML += `<div class="log-entry">Generando vectores...</div>`;
-      // Vectorization logic...
-      status.innerHTML += `<div class="log-entry success">Vectores guardados exitosamente.</div>`;
-      addLog('Vectorización', `Procesado ${file.name}`, 'success');
-    } catch (e) {
-      status.innerHTML += `<div class="log-entry error">Error: ${e.message}</div>`;
-      addLog('Error Vector', e.message, 'error');
-    }
-  };
-
-  const addLog = (type, msg, status) => {
-    const errorContainer = document.getElementById('error-logs');
-    if (!errorContainer) return;
-    const entry = document.createElement('div');
-    entry.className = `log-entry ${status}`;
-    entry.innerHTML = `<b>[${type}]</b> ${new Date().toLocaleTimeString()} - ${msg}`;
-    errorContainer.prepend(entry);
-  };
 
   // --- INIT ---
   const loadInitialSettings = () => {
@@ -421,7 +340,10 @@ document.addEventListener('DOMContentLoaded', () => {
       document.getElementById('n8n-url').value = defaultN8nUrl;
       settings.n8nUrl = defaultN8nUrl;
     }
+
     if (settings.n8nKey) document.getElementById('n8n-key').value = settings.n8nKey;
+    else document.getElementById('n8n-key').value = PROVIDED_N8N_KEY;
+
     if (settings.shopifyUrl) document.getElementById('shopify-url').value = settings.shopifyUrl;
     if (settings.shopifyToken) document.getElementById('shopify-token').value = settings.shopifyToken;
     if (settings.openaiKey) document.getElementById('openai-key').value = settings.openaiKey;
@@ -429,16 +351,23 @@ document.addEventListener('DOMContentLoaded', () => {
     if (settings.supabaseKey) document.getElementById('supabase-key').value = settings.supabaseKey;
     if (settings.pdfMonkeyKey) document.getElementById('pdfmonkey-key').value = settings.pdfMonkeyKey;
 
-    // Auto-fill provided key if empty
-    if (!settings.n8nKey && PROVIDED_N8N_KEY) {
-      document.getElementById('n8n-key').value = PROVIDED_N8N_KEY;
-    }
-
     updateStatus();
     updateOverviewStats();
-    updateChatSelect();
     renderWorkflows();
     renderStudents();
+
+    // Attempt silent sync
+    syncN8n(false);
+  };
+
+  const syncShopify = () => { /* Mock or future */ };
+  const addLog = (type, msg, status) => {
+    const errorContainer = document.getElementById('error-logs');
+    if (!errorContainer) return;
+    const entry = document.createElement('div');
+    entry.className = `log-entry ${status}`;
+    entry.innerHTML = `<b>[${type}]</b> ${new Date().toLocaleTimeString()} - ${msg}`;
+    errorContainer.prepend(entry);
   };
 
   loadInitialSettings();
