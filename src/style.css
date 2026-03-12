@@ -428,6 +428,42 @@ input:checked+.slider:before {
   z-index: 1000;
 }
 
+/* Clickable Cards */
+.stat-card.clickable {
+  cursor: pointer;
+  border: 1px solid rgba(212, 175, 55, 0.1);
+}
+
+.stat-card.clickable:hover {
+  background: rgba(212, 175, 55, 0.05);
+  border-color: var(--primary-gold);
+}
+
+/* Data Tables */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.data-table th {
+  text-align: left;
+  padding: 15px;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  border-bottom: 2px solid var(--glass-border);
+}
+
+.data-table td {
+  padding: 15px;
+  border-bottom: 1px solid var(--glass-border);
+  font-size: 0.9rem;
+}
+
+.data-table tr:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
 .modal-overlay.active {
   display: flex;
 }

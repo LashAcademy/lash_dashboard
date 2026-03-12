@@ -65,29 +65,29 @@
 
     <main class="main-content">
       <!-- Overview Module -->
-      <section id="dashboard" class="module-section active">
+      <section id="overview" class="module-section active">
         <div class="header-action">
           <h2>Business Overview</h2>
-          <div class="status-indicator" id="global-status">
-            <span class="dot"></span> Connected
+          <div id="global-status" class="status-indicator">
+            <span class="dot" style="background:#666"></span> Disconnected
           </div>
         </div>
 
         <div class="stats-grid">
-          <div class="stat-card">
+          <div class="stat-card clickable" data-goto="shopify">
             <h3>Total Sales (Monthly)</h3>
-            <div class="value">€12,450.00</div>
-            <div class="change positive"><i class="fa-solid fa-arrow-up"></i> 12% vs last month</div>
+            <div class="value" id="stat-sales">€0.00</div>
+            <div class="change positive">Waiting for Shopify...</div>
           </div>
-          <div class="stat-card">
+          <div class="stat-card clickable" data-goto="workflows">
             <h3>Active Workflows</h3>
-            <div class="value" id="active-workflows-count">0</div>
-            <div class="change">Automating your academy</div>
+            <div class="value" id="stat-workflows">0</div>
+            <p style="margin-top: 0.5rem; font-size: 0.8rem; color: var(--text-secondary);">Automating your academy</p>
           </div>
-          <div class="stat-card">
+          <div class="stat-card clickable" data-goto="clients">
             <h3>Academy Students</h3>
-            <div class="value">342</div>
-            <div class="change positive"><i class="fa-solid fa-plus"></i> 8 new this week</div>
+            <div class="value" id="stat-students">0</div>
+            <div class="change positive">Manage students in Academy DB</div>
           </div>
         </div>
 
@@ -108,6 +108,29 @@
         </div>
         <div class="wf-grid" id="workflow-list-container">
           <!-- Dynamic list -->
+        </div>
+      </section>
+
+      <!-- Clients Module -->
+      <section id="clients" class="module-section">
+        <div class="header-action">
+          <h2>Academy Students</h2>
+          <button class="btn-primary" id="open-add-student"><i class="fa-solid fa-user-plus"></i> New Student</button>
+        </div>
+        <div class="glass-card" style="padding: 1.5rem;">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Course/Product</th>
+                <th>Email</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="student-list-container">
+              <!-- Dynamic rows -->
+            </tbody>
+          </table>
         </div>
       </section>
 
