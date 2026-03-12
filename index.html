@@ -204,12 +204,17 @@
               <div class="chat-msg system">Dashboard: Sistema listo. Selecciona un workflow para iniciar el chat.</div>
             </div>
             <div class="chat-input-area">
-              <select id="chat-workflow-select" class="chat-select">
-                <option value="">Seleccionar Workflow...</option>
-                <!-- Workflows with webhooks will appear here -->
-              </select>
-              <input type="text" id="chat-input" placeholder="Escribe un mensaje para n8n...">
-              <button id="send-chat" class="btn-primary"><i class="fa-solid fa-paper-plane"></i></button>
+              <div style="display: flex; gap: 5px; width: 100%;">
+                <select id="chat-workflow-select" class="chat-select" style="flex: 1;">
+                  <option value="">Seleccionar Canal...</option>
+                </select>
+                <button id="add-chat-channel" class="btn-secondary" title="Añadir URL de Chat"><i
+                    class="fa-solid fa-plus"></i></button>
+              </div>
+              <div style="display: flex; gap: 10px; width: 100%; margin-top: 10px;">
+                <input type="text" id="chat-input" placeholder="Escribe un mensaje para n8n..." style="flex: 1;">
+                <button id="send-chat" class="btn-primary"><i class="fa-solid fa-paper-plane"></i></button>
+              </div>
             </div>
           </div>
           <div class="card-large">

@@ -1,6 +1,13 @@
 document.addEventListener('DOMContentLoaded', () => {
   // --- STATE ---
-  let workflows = JSON.parse(localStorage.getItem('lash_workflows') || '[]');
+  const defaultWorkflows = [
+    { id: '1', name: 'Facturación Automática (n8n)', status: true, url: '' },
+    { id: '2', name: 'Sincronización Shopify-Lash', status: true, url: '' },
+    { id: '3', name: 'AI WhatsApp Assistant', status: false, url: '' }
+  ];
+
+  let workflows = JSON.parse(localStorage.getItem('lash_workflows') || JSON.stringify(defaultWorkflows));
+  let students = JSON.parse(localStorage.getItem('lash_students') || '[]');
   let settings = JSON.parse(localStorage.getItem('lash_academy_settings') || '{}');
 
   const PROVIDED_N8N_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzYzk3MmE4Zi1jMWI3LTQwMDEtYTM3OC0zNTQ5ZTEyNmMzZDEiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwianRpIjoiYmUxMTBkOWUtNmZiZi00NGVkLWEzYWUtYWMwYTM3OGE1NGE4IiwiaWF0IjoxNzczMzE4Mjc4fQ.SWoFVnUlwqLp04pViVk7-LToSNaIq7fhvfyP7w-c9Pg";
@@ -85,7 +92,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
-  // --- SUPABASE CLIENT (Simple Fetch Wrapper) ---
+  // --- SUPABASE CLIENT ---
   const sbFetch = async (endpoint, method = 'GET', body = null) => {
     if (!settings.supabaseUrl || !settings.supabaseKey) return null;
     const url = `${settings.supabaseUrl}/rest/v1/${endpoint}`;
@@ -116,14 +123,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (wfCountEl) wfCountEl.textContent = workflows.filter(w => w.status).length;
 
-    // Fetch stats from Supabase
     if (settings.supabaseUrl) {
       const clients = await sbFetch('clients?select=id', 'GET');
       if (clients && studentCountEl) studentCountEl.textContent = clients.length;
     }
   };
 
-  // --- ACADEMY DB (Operations Brain) ---
+  // --- ACADEMY DB ---
   const initAcademyDB = () => {
     const tabs = document.querySelectorAll('.tab-btn');
     const dbActions = document.getElementById('db-actions');
@@ -137,7 +143,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const activeTabId = tab.getAttribute('data-tab');
         document.getElementById(activeTabId).classList.add('active');
 
-        // Update button action
         if (activeTabId === 'clients-list') {
           dbActions.innerHTML = '<button class="btn-primary" id="open-add-client"><i class="fa-solid fa-user-plus"></i> Nuevo Cliente</button>';
           document.getElementById('open-add-client').addEventListener('click', openAddClientModal);
@@ -150,67 +155,43 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     });
 
-    // Default load
     renderClients();
     const addClientBtn = document.getElementById('open-add-client');
     if (addClientBtn) addClientBtn.addEventListener('click', openAddClientModal);
   };
 
-  // --- CLIENTS CRUD ---
   const renderClients = async () => {
     const container = document.getElementById('client-list-container');
     if (!container) return;
     container.innerHTML = '<tr><td colspan="5" class="empty-msg">Cargando cerebros...</td></tr>';
-
     const data = await sbFetch('clients?select=*&order=created_at.desc');
     if (!data || data.length === 0) {
-      container.innerHTML = '<tr><td colspan="5" class="empty-msg">No hay clientes en Supabase.</td></tr>';
+      container.innerHTML = '<tr><td colspan="5" class="empty-msg">No hay clientes.</td></tr>';
       return;
     }
-
     container.innerHTML = data.map(c => `
       <tr>
         <td><b>${c.full_name}</b><br><small>${c.email || ''}</small></td>
         <td>${c.city || '-'}</td>
         <td>${c.phone || '-'}<br><small>IG: ${c.instagram || '-'}</small></td>
         <td><span class="badge ${c.status === 'Active' ? 'success' : 'warning'}">${c.status}</span></td>
-        <td>
-          <button class="btn-icon" onclick="deleteClient('${c.id}')"><i class="fa-solid fa-trash"></i></button>
-        </td>
+        <td><button class="btn-icon" onclick="deleteClient('${c.id}')"><i class="fa-solid fa-trash"></i></button></td>
       </tr>
     `).join('');
   };
 
   const openAddClientModal = () => {
     openModal('Registrar Nuevo Cliente', `
-      <div class="input-group">
-        <label>Nombre Completo</label>
-        <input type="text" id="new-c-name">
+      <div class="input-group"><label>Nombre Completo</label><input type="text" id="new-c-name"></div>
+      <div class="grid-2-col">
+        <div class="input-group"><label>Email</label><input type="email" id="new-c-email"></div>
+        <div class="input-group"><label>Teléfono</label><input type="text" id="new-c-phone"></div>
       </div>
       <div class="grid-2-col">
-        <div class="input-group">
-          <label>Email</label>
-          <input type="email" id="new-c-email">
-        </div>
-        <div class="input-group">
-          <label>Teléfono</label>
-          <input type="text" id="new-c-phone">
-        </div>
+        <div class="input-group"><label>Instagram</label><input type="text" id="new-c-ig" placeholder="@usuario"></div>
+        <div class="input-group"><label>Ciudad</label><input type="text" id="new-c-city"></div>
       </div>
-      <div class="grid-2-col">
-        <div class="input-group">
-          <label>Instagram</label>
-          <input type="text" id="new-c-ig" placeholder="@usuario">
-        </div>
-        <div class="input-group">
-          <label>Ciudad</label>
-          <input type="text" id="new-c-city">
-        </div>
-      </div>
-      <div class="input-group">
-        <label>Notas</label>
-        <textarea id="new-c-notes" rows="3" style="width:100%"></textarea>
-      </div>
+      <div class="input-group"><label>Notas</label><textarea id="new-c-notes" rows="3" style="width:100%"></textarea></div>
       <button class="btn-primary" onclick="saveNewClient()">Guardar en Supabase</button>
     `);
   };
@@ -225,69 +206,49 @@ document.addEventListener('DOMContentLoaded', () => {
       notes: document.getElementById('new-c-notes').value
     };
     if (!body.full_name) return alert('El nombre es obligatorio');
-
     const res = await sbFetch('clients', 'POST', body);
-    if (res) {
-      closeModal();
-      renderClients();
-      updateOverviewStats();
-    }
+    if (res) { closeModal(); renderClients(); updateOverviewStats(); }
   };
 
   window.deleteClient = async (id) => {
-    if (!confirm('¿Seguro que quieres borrar este cliente?')) return;
+    if (!confirm('¿Seguro?')) return;
     const res = await sbFetch(`clients?id=eq.${id}`, 'DELETE');
     if (res) renderClients();
   };
 
-  // --- CATALOG CRUD ---
   const renderCatalog = async () => {
     const container = document.getElementById('catalog-list-container');
     if (!container) return;
     container.innerHTML = '<tr><td colspan="5" class="empty-msg">Cargando catálogo...</td></tr>';
-
     const data = await sbFetch('catalog?select=*&order=created_at.desc');
     if (!data || data.length === 0) {
-      container.innerHTML = '<tr><td colspan="5" class="empty-msg">El catálogo está vacío.</td></tr>';
+      container.innerHTML = '<tr><td colspan="5" class="empty-msg">Vaciado.</td></tr>';
       return;
     }
-
     container.innerHTML = data.map(v => `
       <tr>
         <td><b>${v.name}</b></td>
         <td>${v.type}</td>
         <td>€${v.price}</td>
         <td><span class="badge success">${v.status}</span></td>
-        <td>
-          <button class="btn-icon" onclick="deleteCatalog('${v.id}')"><i class="fa-solid fa-trash"></i></button>
-        </td>
+        <td><button class="btn-icon" onclick="deleteCatalog('${v.id}')"><i class="fa-solid fa-trash"></i></button></td>
       </tr>
     `).join('');
   };
 
   const openAddCatalogModal = () => {
     openModal('Añadir al Catálogo', `
-      <div class="input-group">
-        <label>Nombre del Item</label>
-        <input type="text" id="new-v-name">
-      </div>
-      <div class="input-group">
-        <label>Tipo</label>
+      <div class="input-group"><label>Nombre del Item</label><input type="text" id="new-v-name"></div>
+      <div class="input-group"><label>Tipo</label>
         <select id="new-v-type" class="chat-select" style="width:100%">
           <option value="Formation">Formación</option>
           <option value="Service">Servicio</option>
           <option value="Product">Producto Físico</option>
         </select>
       </div>
-      <div class="input-group">
-        <label>Precio (€)</label>
-        <input type="number" id="new-v-price">
-      </div>
-      <div class="input-group">
-        <label>Descripción / Duración</label>
-        <input type="text" id="new-v-description" placeholder="Ej: 3 días">
-      </div>
-      <button class="btn-primary" onclick="saveNewCatalog()">Añadir al Cerebro</button>
+      <div class="input-group"><label>Precio (€)</label><input type="number" id="new-v-price"></div>
+      <div class="input-group"><label>Descripción</label><input type="text" id="new-v-description"></div>
+      <button class="btn-primary" onclick="saveNewCatalog()">Añadir</button>
     `);
   };
 
@@ -299,16 +260,12 @@ document.addEventListener('DOMContentLoaded', () => {
       description: document.getElementById('new-v-description').value
     };
     if (!body.name) return alert('El nombre es obligatorio');
-
     const res = await sbFetch('catalog', 'POST', body);
-    if (res) {
-      closeModal();
-      renderCatalog();
-    }
+    if (res) { closeModal(); renderCatalog(); }
   };
 
   window.deleteCatalog = async (id) => {
-    if (!confirm('¿Eliminar del catálogo?')) return;
+    if (!confirm('¿Eliminar?')) return;
     const res = await sbFetch(`catalog?id=eq.${id}`, 'DELETE');
     if (res) renderCatalog();
   };
@@ -319,16 +276,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!container) return;
     container.innerHTML = workflows.map(wf => `
       <div class="workflow-card">
-        <div class="wf-info">
-          <h4>${wf.name}</h4>
-          <p>${wf.status ? 'Activo' : 'Pausado'}</p>
-        </div>
+        <div class="wf-info"><h4>${wf.name}</h4><p>${wf.status ? 'Activo' : 'Pausado'}</p></div>
         <div style="display:flex; align-items:center; gap:15px;">
           <button class="btn-icon" onclick="deleteWorkflow('${wf.id}')"><i class="fa-solid fa-trash"></i></button>
-          <label class="switch">
-            <input type="checkbox" ${wf.status ? 'checked' : ''} onchange="toggleWorkflow('${wf.id}')">
-            <span class="slider"></span>
-          </label>
+          <label class="switch"><input type="checkbox" ${wf.status ? 'checked' : ''} onchange="toggleWorkflow('${wf.id}')"><span class="slider"></span></label>
         </div>
       </div>
     `).join('');
@@ -338,6 +289,7 @@ document.addEventListener('DOMContentLoaded', () => {
     workflows = workflows.filter(w => w.id !== id);
     localStorage.setItem('lash_workflows', JSON.stringify(workflows));
     renderWorkflows();
+    updateChatSelect();
   };
 
   window.toggleWorkflow = (id) => {
@@ -345,19 +297,14 @@ document.addEventListener('DOMContentLoaded', () => {
     if (wf) wf.status = !wf.status;
     localStorage.setItem('lash_workflows', JSON.stringify(workflows));
     renderWorkflows();
+    updateChatSelect();
   };
 
   const addWfBtn = document.getElementById('open-add-workflow');
   if (addWfBtn) addWfBtn.addEventListener('click', () => {
     openModal('Añadir Workflow Manual', `
-      <div class="input-group">
-        <label>Nombre</label>
-        <input type="text" id="new-wf-name">
-      </div>
-      <div class="input-group">
-        <label>Webhook URL</label>
-        <input type="text" id="new-wf-url">
-      </div>
+      <div class="input-group"><label>Nombre</label><input type="text" id="new-wf-name" placeholder="Ej: Chat de n8n"></div>
+      <div class="input-group"><label>Webhook URL / Chat URL</label><input type="text" id="new-wf-url" placeholder="https://..."></div>
       <button class="btn-primary" onclick="saveNewWorkflow()">Guardar</button>
     `);
   });
@@ -370,6 +317,7 @@ document.addEventListener('DOMContentLoaded', () => {
     localStorage.setItem('lash_workflows', JSON.stringify(workflows));
     closeModal();
     renderWorkflows();
+    updateChatSelect();
   };
 
   // --- COMM HUB Logic ---
@@ -377,43 +325,88 @@ document.addEventListener('DOMContentLoaded', () => {
     const chatSelect = document.getElementById('chat-workflow-select');
     if (!chatSelect) return;
     const activeWebhooks = workflows.filter(w => w.status && w.url);
-    chatSelect.innerHTML = '<option value="">Seleccionar Workflow...</option>' +
+    chatSelect.innerHTML = '<option value="">Seleccionar Canal...</option>' +
       activeWebhooks.map(w => `<option value="${w.url}">${w.name}</option>`).join('');
+  };
+
+  const addChatChannelBtn = document.getElementById('add-chat-channel');
+  if (addChatChannelBtn) {
+    addChatChannelBtn.addEventListener('click', () => {
+      openModal('Añadir Canal de Chat (n8n)', `
+          <div class="input-group"><label>Nombre del Canal</label><input type="text" id="hub-name" placeholder="Ej: Soporte Marbella"></div>
+          <div class="input-group"><label>URL de Chat (Copia de n8n)</label><input type="text" id="hub-url" placeholder="https://.../chat"></div>
+          <button class="btn-primary" onclick="saveChatHub()">Conectar Canal</button>
+        `);
+    });
+  }
+
+  window.saveChatHub = () => {
+    const name = document.getElementById('hub-name').value;
+    const url = document.getElementById('hub-url').value;
+    if (!name || !url) return;
+    workflows.push({ id: `chat-${Date.now()}`, name, url, status: true });
+    localStorage.setItem('lash_workflows', JSON.stringify(workflows));
+    closeModal();
+    updateChatSelect();
+    alert('Canal añadido con éxito');
   };
 
   const sendChatBtn = document.getElementById('send-chat');
   if (sendChatBtn) {
     sendChatBtn.addEventListener('click', async () => {
-      const text = document.getElementById('chat-input').value;
+      const input = document.getElementById('chat-input');
+      const text = input.value;
       const url = document.getElementById('chat-workflow-select').value;
       if (!text || !url) return;
 
-      // Add user msg
       const chatBox = document.getElementById('chat-messages');
       const userMsg = document.createElement('div');
       userMsg.className = 'chat-msg user';
       userMsg.textContent = text;
       chatBox.appendChild(userMsg);
-      document.getElementById('chat-input').value = '';
+      input.value = '';
+      chatBox.scrollTop = chatBox.scrollHeight;
 
       try {
+        // n8n Chat Trigger expects "chatInput"
         const res = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: text, sender: 'Dashboard Agent' })
+          body: JSON.stringify({ chatInput: text, message: text, sender: 'Lash-Dashboard' })
         });
+
         if (res.ok) {
           const data = await res.json();
           const aiMsg = document.createElement('div');
           aiMsg.className = 'chat-msg n8n';
-          aiMsg.textContent = data.response || data.output || 'Workflow activado.';
+          // n8n Chat Trigger usually returns the text directly or in a field
+          aiMsg.textContent = data.output || data.response || data.text || (typeof data === 'string' ? data : 'Mensaje enviado.');
           chatBox.appendChild(aiMsg);
+          chatBox.scrollTop = chatBox.scrollHeight;
         }
-      } catch (e) { console.error('Chat failed'); }
+      } catch (e) {
+        console.error('Chat error:', e);
+        const sysMsg = document.createElement('div');
+        sysMsg.className = 'chat-msg system';
+        sysMsg.textContent = 'Error de conexión con n8n.';
+        chatBox.appendChild(sysMsg);
+      }
     });
   }
 
-  // --- SHOPIFY Mock ---
+  // --- INIT ---
+  const loadInitialSettings = () => {
+    Object.keys(settings).forEach(key => {
+      const input = document.getElementById(key.replace(/([A-Z])/g, '-$1').toLowerCase());
+      if (input) input.value = settings[key];
+    });
+    if (!document.getElementById('n8n-url').value) document.getElementById('n8n-url').value = 'https://lash-academy-agentes-n8n.ed2taz.easypanel.host';
+    if (!document.getElementById('n8n-key').value) document.getElementById('n8n-key').value = PROVIDED_N8N_KEY;
+    updateStatus();
+    updateOverviewStats();
+    updateChatSelect();
+  };
+
   const syncShopify = () => {
     const salesStat = document.getElementById('stat-sales');
     if (salesStat) salesStat.textContent = '€14,820.00';
@@ -425,21 +418,6 @@ document.addEventListener('DOMContentLoaded', () => {
     entry.innerHTML = `<b>[${type}]</b> ${new Date().toLocaleTimeString()} - ${msg}`;
     const logs = document.getElementById('error-logs');
     if (logs) logs.prepend(entry);
-  };
-
-  // --- INIT ---
-  const loadInitialSettings = () => {
-    Object.keys(settings).forEach(key => {
-      const input = document.getElementById(key.replace(/([A-Z])/g, '-$1').toLowerCase());
-      if (input) input.value = settings[key];
-    });
-
-    // Defaults if empty
-    if (!document.getElementById('n8n-url').value) document.getElementById('n8n-url').value = 'https://lash-academy-agentes-n8n.ed2taz.easypanel.host';
-    if (!document.getElementById('n8n-key').value) document.getElementById('n8n-key').value = PROVIDED_N8N_KEY;
-
-    updateStatus();
-    updateOverviewStats();
   };
 
   loadInitialSettings();
