@@ -114,26 +114,57 @@
         </div>
       </section>
 
-      <!-- Clients Module -->
+      <!-- Academy DB Module (Operations Brain) -->
       <section id="clients" class="module-section">
         <div class="header-action">
-          <h2>Academy Students</h2>
-          <button class="btn-primary" id="open-add-student"><i class="fa-solid fa-user-plus"></i> New Student</button>
+          <div class="tabs-container">
+            <button class="tab-btn active" data-tab="clients-list">Clientes</button>
+            <button class="tab-btn" data-tab="catalog-list">Productos & Formaciones</button>
+          </div>
+          <div id="db-actions">
+            <button class="btn-primary" id="open-add-client"><i class="fa-solid fa-user-plus"></i> Nuevo
+              Cliente</button>
+          </div>
         </div>
-        <div class="glass-card" style="padding: 1.5rem;">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Course/Product</th>
-                <th>Email</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody id="student-list-container">
-              <!-- Dynamic rows -->
-            </tbody>
-          </table>
+
+        <!-- Clientes Tab -->
+        <div id="clients-list" class="tab-content active">
+          <div class="glass-card" style="padding: 1.5rem;">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Nombre</th>
+                  <th>Ciudad</th>
+                  <th>Contacto</th>
+                  <th>Estado</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="client-list-container">
+                <!-- Supabase dynamic rows -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Catalog Tab -->
+        <div id="catalog-list" class="tab-content">
+          <div class="glass-card" style="padding: 1.5rem;">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Nombre</th>
+                  <th>Tipo</th>
+                  <th>Precio</th>
+                  <th>Estado</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="catalog-list-container">
+                <!-- Supabase dynamic rows -->
+              </tbody>
+            </table>
+          </div>
         </div>
       </section>
 

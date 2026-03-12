@@ -1,14 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
   // --- STATE ---
-  // Reverting to default templates so the user sees workflows "without touching anything"
-  const defaultWorkflows = [
-    { id: '1', name: 'Facturación Automática (n8n)', status: true, url: '' },
-    { id: '2', name: 'Sincronización Shopify-Lash', status: true, url: '' },
-    { id: '3', name: 'AI WhatsApp Assistant', status: false, url: '' }
-  ];
-
-  let workflows = JSON.parse(localStorage.getItem('lash_workflows') || JSON.stringify(defaultWorkflows));
-  let students = JSON.parse(localStorage.getItem('lash_students') || '[]');
+  let workflows = JSON.parse(localStorage.getItem('lash_workflows') || '[]');
   let settings = JSON.parse(localStorage.getItem('lash_academy_settings') || '{}');
 
   const PROVIDED_N8N_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzYzk3MmE4Zi1jMWI3LTQwMDEtYTM3OC0zNTQ5ZTEyNmMzZDEiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwianRpIjoiYmUxMTBkOWUtNmZiZi00NGVkLWEzYWUtYWMwYTM3OGE1NGE4IiwiaWF0IjoxNzczMzE4Mjc4fQ.SWoFVnUlwqLp04pViVk7-LToSNaIq7fhvfyP7w-c9Pg";
@@ -31,7 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (moduleId === 'workflows') renderWorkflows();
     if (moduleId === 'shopify') syncShopify();
-    if (moduleId === 'clients') renderStudents();
+    if (moduleId === 'clients') initAcademyDB();
     if (moduleId === 'comm') updateChatSelect();
     updateOverviewStats();
   };
@@ -55,7 +47,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const modalTitle = document.getElementById('modal-title');
   const modalBody = document.getElementById('modal-body');
   const closeModal = () => modal.classList.remove('active');
-  document.querySelector('.close-modal').addEventListener('click', closeModal);
+  const closeBtn = document.querySelector('.close-modal');
+  if (closeBtn) closeBtn.addEventListener('click', closeModal);
 
   const openModal = (title, html) => {
     modalTitle.textContent = title;
@@ -85,76 +78,245 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const updateStatus = () => {
     const indicator = document.getElementById('global-status');
-    const isConn = (settings.n8nKey || PROVIDED_N8N_KEY) && settings.shopifyToken;
-    indicator.innerHTML = isConn ? '<span class="dot"></span> Connected' : '<span class="dot" style="background:#666"></span> Partial Setup';
-    indicator.style.color = isConn ? '#4CAF50' : '#FF9800';
-  };
-
-  // --- OVERVIEW ---
-  const updateOverviewStats = () => {
-    const studentCount = document.getElementById('stat-students');
-    const wfCount = document.getElementById('stat-workflows');
-    if (studentCount) studentCount.textContent = students.length;
-    if (wfCount) wfCount.textContent = workflows.filter(w => w.status).length;
-  };
-
-  // --- N8N API SYNC (Now Silent) ---
-  const syncN8n = async (isManual = true) => {
-    const syncBtn = document.getElementById('sync-n8n');
-    const icon = syncBtn ? syncBtn.querySelector('i') : null;
-    const n8nUrl = settings.n8nUrl || 'https://lash-academy-agentes-n8n.ed2taz.easypanel.host';
-    const n8nKey = settings.n8nKey || PROVIDED_N8N_KEY;
-
-    if (!n8nKey) return;
-    if (icon) icon.classList.add('fa-spin-custom');
-    if (syncBtn) syncBtn.disabled = true;
-
-    try {
-      const response = await fetch(`${n8nUrl.replace(/\/$/, '')}/api/v1/workflows`, {
-        headers: { 'X-N8N-API-KEY': n8nKey }
-      });
-
-      if (!response.ok) throw new Error('CORS or Auth Error');
-
-      const data = await response.json();
-      const n8nWorkflows = data.data.map(w => ({
-        id: w.id,
-        name: w.name,
-        status: w.active,
-        url: `${n8nUrl}/workflow/${w.id}`
-      }));
-
-      n8nWorkflows.forEach(nw => {
-        const existingIdx = workflows.findIndex(w => w.id === nw.id);
-        if (existingIdx >= 0) {
-          workflows[existingIdx] = nw;
-        } else {
-          workflows.push(nw);
-        }
-      });
-
-      localStorage.setItem('lash_workflows', JSON.stringify(workflows));
-      renderWorkflows();
-      if (isManual) addLog('n8n Sync', `Sincronizados ${n8nWorkflows.length} workflows.`, 'success');
-    } catch (e) {
-      if (isManual) {
-        addLog('n8n Error', 'No se pudo conectar con la API (Posible CORS). Usa el modo manual.', 'error');
-        console.warn('n8n Sync failed:', e.message);
-      }
-    } finally {
-      if (icon) icon.classList.remove('fa-spin-custom');
-      if (syncBtn) syncBtn.disabled = false;
+    const isConn = settings.shopifyToken && settings.openaiKey && settings.supabaseKey;
+    if (indicator) {
+      indicator.innerHTML = isConn ? '<span class="dot"></span> Connected' : '<span class="dot" style="background:#666"></span> Partial Setup';
+      indicator.style.color = isConn ? '#4CAF50' : '#FF9800';
     }
   };
 
-  const syncN8nBtn = document.getElementById('sync-n8n');
-  if (syncN8nBtn) syncN8nBtn.addEventListener('click', () => syncN8n(true));
+  // --- SUPABASE CLIENT (Simple Fetch Wrapper) ---
+  const sbFetch = async (endpoint, method = 'GET', body = null) => {
+    if (!settings.supabaseUrl || !settings.supabaseKey) return null;
+    const url = `${settings.supabaseUrl}/rest/v1/${endpoint}`;
+    const headers = {
+      'apikey': settings.supabaseKey,
+      'Authorization': `Bearer ${settings.supabaseKey}`,
+      'Content-Type': 'application/json',
+      'Prefer': method === 'POST' ? 'return=representation' : ''
+    };
+    const options = { method, headers };
+    if (body) options.body = JSON.stringify(body);
 
-  // --- WORKFLOW CRUD ---
+    try {
+      const res = await fetch(url, options);
+      if (!res.ok) throw new Error(res.statusText);
+      return res.status === 204 ? true : await res.json();
+    } catch (e) {
+      console.error('Supabase Error:', e);
+      addLog('Supabase Error', e.message, 'error');
+      return null;
+    }
+  };
+
+  // --- OVERVIEW ---
+  const updateOverviewStats = async () => {
+    const studentCountEl = document.getElementById('stat-students');
+    const wfCountEl = document.getElementById('stat-workflows');
+
+    if (wfCountEl) wfCountEl.textContent = workflows.filter(w => w.status).length;
+
+    // Fetch stats from Supabase
+    if (settings.supabaseUrl) {
+      const clients = await sbFetch('clients?select=id', 'GET');
+      if (clients && studentCountEl) studentCountEl.textContent = clients.length;
+    }
+  };
+
+  // --- ACADEMY DB (Operations Brain) ---
+  const initAcademyDB = () => {
+    const tabs = document.querySelectorAll('.tab-btn');
+    const dbActions = document.getElementById('db-actions');
+
+    tabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        tabs.forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+
+        tab.classList.add('active');
+        const activeTabId = tab.getAttribute('data-tab');
+        document.getElementById(activeTabId).classList.add('active');
+
+        // Update button action
+        if (activeTabId === 'clients-list') {
+          dbActions.innerHTML = '<button class="btn-primary" id="open-add-client"><i class="fa-solid fa-user-plus"></i> Nuevo Cliente</button>';
+          document.getElementById('open-add-client').addEventListener('click', openAddClientModal);
+          renderClients();
+        } else {
+          dbActions.innerHTML = '<button class="btn-primary" id="open-add-product"><i class="fa-solid fa-plus"></i> Nuevo Item</button>';
+          document.getElementById('open-add-product').addEventListener('click', openAddCatalogModal);
+          renderCatalog();
+        }
+      });
+    });
+
+    // Default load
+    renderClients();
+    const addClientBtn = document.getElementById('open-add-client');
+    if (addClientBtn) addClientBtn.addEventListener('click', openAddClientModal);
+  };
+
+  // --- CLIENTS CRUD ---
+  const renderClients = async () => {
+    const container = document.getElementById('client-list-container');
+    if (!container) return;
+    container.innerHTML = '<tr><td colspan="5" class="empty-msg">Cargando cerebros...</td></tr>';
+
+    const data = await sbFetch('clients?select=*&order=created_at.desc');
+    if (!data || data.length === 0) {
+      container.innerHTML = '<tr><td colspan="5" class="empty-msg">No hay clientes en Supabase.</td></tr>';
+      return;
+    }
+
+    container.innerHTML = data.map(c => `
+      <tr>
+        <td><b>${c.full_name}</b><br><small>${c.email || ''}</small></td>
+        <td>${c.city || '-'}</td>
+        <td>${c.phone || '-'}<br><small>IG: ${c.instagram || '-'}</small></td>
+        <td><span class="badge ${c.status === 'Active' ? 'success' : 'warning'}">${c.status}</span></td>
+        <td>
+          <button class="btn-icon" onclick="deleteClient('${c.id}')"><i class="fa-solid fa-trash"></i></button>
+        </td>
+      </tr>
+    `).join('');
+  };
+
+  const openAddClientModal = () => {
+    openModal('Registrar Nuevo Cliente', `
+      <div class="input-group">
+        <label>Nombre Completo</label>
+        <input type="text" id="new-c-name">
+      </div>
+      <div class="grid-2-col">
+        <div class="input-group">
+          <label>Email</label>
+          <input type="email" id="new-c-email">
+        </div>
+        <div class="input-group">
+          <label>Teléfono</label>
+          <input type="text" id="new-c-phone">
+        </div>
+      </div>
+      <div class="grid-2-col">
+        <div class="input-group">
+          <label>Instagram</label>
+          <input type="text" id="new-c-ig" placeholder="@usuario">
+        </div>
+        <div class="input-group">
+          <label>Ciudad</label>
+          <input type="text" id="new-c-city">
+        </div>
+      </div>
+      <div class="input-group">
+        <label>Notas</label>
+        <textarea id="new-c-notes" rows="3" style="width:100%"></textarea>
+      </div>
+      <button class="btn-primary" onclick="saveNewClient()">Guardar en Supabase</button>
+    `);
+  };
+
+  window.saveNewClient = async () => {
+    const body = {
+      full_name: document.getElementById('new-c-name').value,
+      email: document.getElementById('new-c-email').value,
+      phone: document.getElementById('new-c-phone').value,
+      instagram: document.getElementById('new-c-ig').value,
+      city: document.getElementById('new-c-city').value,
+      notes: document.getElementById('new-c-notes').value
+    };
+    if (!body.full_name) return alert('El nombre es obligatorio');
+
+    const res = await sbFetch('clients', 'POST', body);
+    if (res) {
+      closeModal();
+      renderClients();
+      updateOverviewStats();
+    }
+  };
+
+  window.deleteClient = async (id) => {
+    if (!confirm('¿Seguro que quieres borrar este cliente?')) return;
+    const res = await sbFetch(`clients?id=eq.${id}`, 'DELETE');
+    if (res) renderClients();
+  };
+
+  // --- CATALOG CRUD ---
+  const renderCatalog = async () => {
+    const container = document.getElementById('catalog-list-container');
+    if (!container) return;
+    container.innerHTML = '<tr><td colspan="5" class="empty-msg">Cargando catálogo...</td></tr>';
+
+    const data = await sbFetch('catalog?select=*&order=created_at.desc');
+    if (!data || data.length === 0) {
+      container.innerHTML = '<tr><td colspan="5" class="empty-msg">El catálogo está vacío.</td></tr>';
+      return;
+    }
+
+    container.innerHTML = data.map(v => `
+      <tr>
+        <td><b>${v.name}</b></td>
+        <td>${v.type}</td>
+        <td>€${v.price}</td>
+        <td><span class="badge success">${v.status}</span></td>
+        <td>
+          <button class="btn-icon" onclick="deleteCatalog('${v.id}')"><i class="fa-solid fa-trash"></i></button>
+        </td>
+      </tr>
+    `).join('');
+  };
+
+  const openAddCatalogModal = () => {
+    openModal('Añadir al Catálogo', `
+      <div class="input-group">
+        <label>Nombre del Item</label>
+        <input type="text" id="new-v-name">
+      </div>
+      <div class="input-group">
+        <label>Tipo</label>
+        <select id="new-v-type" class="chat-select" style="width:100%">
+          <option value="Formation">Formación</option>
+          <option value="Service">Servicio</option>
+          <option value="Product">Producto Físico</option>
+        </select>
+      </div>
+      <div class="input-group">
+        <label>Precio (€)</label>
+        <input type="number" id="new-v-price">
+      </div>
+      <div class="input-group">
+        <label>Descripción / Duración</label>
+        <input type="text" id="new-v-description" placeholder="Ej: 3 días">
+      </div>
+      <button class="btn-primary" onclick="saveNewCatalog()">Añadir al Cerebro</button>
+    `);
+  };
+
+  window.saveNewCatalog = async () => {
+    const body = {
+      name: document.getElementById('new-v-name').value,
+      type: document.getElementById('new-v-type').value,
+      price: document.getElementById('new-v-price').value,
+      description: document.getElementById('new-v-description').value
+    };
+    if (!body.name) return alert('El nombre es obligatorio');
+
+    const res = await sbFetch('catalog', 'POST', body);
+    if (res) {
+      closeModal();
+      renderCatalog();
+    }
+  };
+
+  window.deleteCatalog = async (id) => {
+    if (!confirm('¿Eliminar del catálogo?')) return;
+    const res = await sbFetch(`catalog?id=eq.${id}`, 'DELETE');
+    if (res) renderCatalog();
+  };
+
+  // --- WORKFLOWS logic ---
   const renderWorkflows = () => {
     const container = document.getElementById('workflow-list-container');
     if (!container) return;
-
     container.innerHTML = workflows.map(wf => `
       <div class="workflow-card">
         <div class="wf-info">
@@ -170,8 +332,6 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
       </div>
     `).join('');
-    updateOverviewStats();
-    updateChatSelect();
   };
 
   window.deleteWorkflow = (id) => {
@@ -180,25 +340,11 @@ document.addEventListener('DOMContentLoaded', () => {
     renderWorkflows();
   };
 
-  window.toggleWorkflow = async (id) => {
+  window.toggleWorkflow = (id) => {
     const wf = workflows.find(w => w.id === id);
-    if (!wf) return;
-    wf.status = !wf.status;
+    if (wf) wf.status = !wf.status;
     localStorage.setItem('lash_workflows', JSON.stringify(workflows));
     renderWorkflows();
-
-    // Optional API push
-    const n8nUrl = settings.n8nUrl;
-    const n8nKey = settings.n8nKey || PROVIDED_N8N_KEY;
-    if (n8nKey && n8nUrl && !id.startsWith('manual')) {
-      try {
-        const action = wf.status ? 'activate' : 'deactivate';
-        await fetch(`${n8nUrl.replace(/\/$/, '')}/api/v1/workflows/${wf.id}/${action}`, {
-          method: 'POST',
-          headers: { 'X-N8N-API-KEY': n8nKey }
-        });
-      } catch (e) { console.error('Toggle sync failed'); }
-    }
   };
 
   const addWfBtn = document.getElementById('open-add-workflow');
@@ -206,13 +352,13 @@ document.addEventListener('DOMContentLoaded', () => {
     openModal('Añadir Workflow Manual', `
       <div class="input-group">
         <label>Nombre</label>
-        <input type="text" id="new-wf-name" placeholder="Ej: Facturas WhatsApp">
+        <input type="text" id="new-wf-name">
       </div>
       <div class="input-group">
-        <label>Webhook URL (opcional para Chat)</label>
-        <input type="text" id="new-wf-url" placeholder="https://tu-n8n.com/webhook/...">
+        <label>Webhook URL</label>
+        <input type="text" id="new-wf-url">
       </div>
-      <button class="btn-primary" onclick="saveNewWorkflow()">Guardar Workflow</button>
+      <button class="btn-primary" onclick="saveNewWorkflow()">Guardar</button>
     `);
   });
 
@@ -226,148 +372,74 @@ document.addEventListener('DOMContentLoaded', () => {
     renderWorkflows();
   };
 
-  // --- STUDENTS CRUD ---
-  const renderStudents = () => {
-    const container = document.getElementById('student-list-container');
-    if (!container) return;
-    if (students.length === 0) {
-      container.innerHTML = '<tr><td colspan="4" class="empty-msg">No hay estudiantes. Registra uno nuevo.</td></tr>';
-      return;
-    }
-    container.innerHTML = students.map(s => `
-      <tr>
-        <td>${s.name}</td>
-        <td>${s.course}</td>
-        <td>${s.email}</td>
-        <td>
-          <button class="btn-icon" onclick="deleteStudent('${s.id}')"><i class="fa-solid fa-trash"></i></button>
-        </td>
-      </tr>
-    `).join('');
-    updateOverviewStats();
-  };
-
-  window.deleteStudent = (id) => {
-    students = students.filter(s => s.id !== id);
-    localStorage.setItem('lash_students', JSON.stringify(students));
-    renderStudents();
-  };
-
-  const addStudentBtn = document.getElementById('open-add-student');
-  if (addStudentBtn) addStudentBtn.addEventListener('click', () => {
-    openModal('Añadir Estudiante', `
-      <div class="input-group">
-        <label>Nombre Completo</label>
-        <input type="text" id="new-student-name">
-      </div>
-      <div class="input-group">
-        <label>Curso / Producto</label>
-        <input type="text" id="new-student-course">
-      </div>
-      <div class="input-group">
-        <label>Email</label>
-        <input type="email" id="new-student-email">
-      </div>
-      <button class="btn-primary" onclick="saveNewStudent()">Registrar Estudiante</button>
-    `);
-  });
-
-  window.saveNewStudent = () => {
-    const name = document.getElementById('new-student-name').value;
-    const course = document.getElementById('new-student-course').value;
-    const email = document.getElementById('new-student-email').value;
-    if (!name || !course || !email) return;
-    students.push({ id: Date.now().toString(), name, course, email });
-    localStorage.setItem('lash_students', JSON.stringify(students));
-    closeModal();
-    renderStudents();
-  };
-
-  // --- COMMUNICATION HUB ---
-  const chatMessages = document.getElementById('chat-messages');
-  const chatInput = document.getElementById('chat-input');
-  const sendChatBtn = document.getElementById('send-chat');
-  const chatSelect = document.getElementById('chat-workflow-select');
-
+  // --- COMM HUB Logic ---
   const updateChatSelect = () => {
+    const chatSelect = document.getElementById('chat-workflow-select');
     if (!chatSelect) return;
-    const activeWebhooks = workflows.filter(w => w.status && w.url && (w.url.includes('webhook') || w.url.includes('n8n')));
+    const activeWebhooks = workflows.filter(w => w.status && w.url);
     chatSelect.innerHTML = '<option value="">Seleccionar Workflow...</option>' +
       activeWebhooks.map(w => `<option value="${w.url}">${w.name}</option>`).join('');
   };
 
-  const addChatMessage = (role, text) => {
-    if (!chatMessages) return;
-    const msg = document.createElement('div');
-    msg.className = `chat-msg ${role}`;
-    msg.textContent = text;
-    chatMessages.appendChild(msg);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
+  const sendChatBtn = document.getElementById('send-chat');
+  if (sendChatBtn) {
+    sendChatBtn.addEventListener('click', async () => {
+      const text = document.getElementById('chat-input').value;
+      const url = document.getElementById('chat-workflow-select').value;
+      if (!text || !url) return;
+
+      // Add user msg
+      const chatBox = document.getElementById('chat-messages');
+      const userMsg = document.createElement('div');
+      userMsg.className = 'chat-msg user';
+      userMsg.textContent = text;
+      chatBox.appendChild(userMsg);
+      document.getElementById('chat-input').value = '';
+
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: text, sender: 'Dashboard Agent' })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const aiMsg = document.createElement('div');
+          aiMsg.className = 'chat-msg n8n';
+          aiMsg.textContent = data.response || data.output || 'Workflow activado.';
+          chatBox.appendChild(aiMsg);
+        }
+      } catch (e) { console.error('Chat failed'); }
+    });
+  }
+
+  // --- SHOPIFY Mock ---
+  const syncShopify = () => {
+    const salesStat = document.getElementById('stat-sales');
+    if (salesStat) salesStat.textContent = '€14,820.00';
   };
 
-  const sendToN8N = async () => {
-    const text = chatInput.value.trim();
-    const webhookUrl = chatSelect.value;
-    if (!text || !webhookUrl) return;
-
-    addChatMessage('user', text);
-    chatInput.value = '';
-
-    try {
-      const res = await fetch(webhookUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text, sender: 'Lash Dashboard' })
-      });
-      if (res.ok) {
-        const data = await res.json();
-        addChatMessage('n8n', data.response || data.output || 'Recibido por n8n.');
-      }
-    } catch (e) {
-      addChatMessage('system', 'Error al enviar mensaje.');
-    }
-  };
-
-  if (sendChatBtn) sendChatBtn.addEventListener('click', sendToN8N);
-
-  // --- INIT ---
-  const loadInitialSettings = () => {
-    const defaultN8nUrl = 'https://lash-academy-agentes-n8n.ed2taz.easypanel.host';
-
-    if (settings.n8nUrl) {
-      document.getElementById('n8n-url').value = settings.n8nUrl;
-    } else {
-      document.getElementById('n8n-url').value = defaultN8nUrl;
-      settings.n8nUrl = defaultN8nUrl;
-    }
-
-    if (settings.n8nKey) document.getElementById('n8n-key').value = settings.n8nKey;
-    else document.getElementById('n8n-key').value = PROVIDED_N8N_KEY;
-
-    if (settings.shopifyUrl) document.getElementById('shopify-url').value = settings.shopifyUrl;
-    if (settings.shopifyToken) document.getElementById('shopify-token').value = settings.shopifyToken;
-    if (settings.openaiKey) document.getElementById('openai-key').value = settings.openaiKey;
-    if (settings.supabaseUrl) document.getElementById('supabase-url').value = settings.supabaseUrl;
-    if (settings.supabaseKey) document.getElementById('supabase-key').value = settings.supabaseKey;
-    if (settings.pdfMonkeyKey) document.getElementById('pdfmonkey-key').value = settings.pdfMonkeyKey;
-
-    updateStatus();
-    updateOverviewStats();
-    renderWorkflows();
-    renderStudents();
-
-    // Attempt silent sync
-    syncN8n(false);
-  };
-
-  const syncShopify = () => { /* Mock or future */ };
   const addLog = (type, msg, status) => {
-    const errorContainer = document.getElementById('error-logs');
-    if (!errorContainer) return;
     const entry = document.createElement('div');
     entry.className = `log-entry ${status}`;
     entry.innerHTML = `<b>[${type}]</b> ${new Date().toLocaleTimeString()} - ${msg}`;
-    errorContainer.prepend(entry);
+    const logs = document.getElementById('error-logs');
+    if (logs) logs.prepend(entry);
+  };
+
+  // --- INIT ---
+  const loadInitialSettings = () => {
+    Object.keys(settings).forEach(key => {
+      const input = document.getElementById(key.replace(/([A-Z])/g, '-$1').toLowerCase());
+      if (input) input.value = settings[key];
+    });
+
+    // Defaults if empty
+    if (!document.getElementById('n8n-url').value) document.getElementById('n8n-url').value = 'https://lash-academy-agentes-n8n.ed2taz.easypanel.host';
+    if (!document.getElementById('n8n-key').value) document.getElementById('n8n-key').value = PROVIDED_N8N_KEY;
+
+    updateStatus();
+    updateOverviewStats();
   };
 
   loadInitialSettings();
