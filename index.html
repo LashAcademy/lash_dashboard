@@ -36,12 +36,22 @@
         </li>
         <li class="nav-item">
           <a class="nav-link" data-module="shopify">
-            <i class="fa-brands fa-shopify"></i> Shopify Store
+            <i class="fa-brands fa-shopify"></i> Sales & Shop
           </a>
         </li>
         <li class="nav-item">
           <a class="nav-link" data-module="clients">
-            <i class="fa-solid fa-users"></i> Clients DB
+            <i class="fa-solid fa-users"></i> Academy DB
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" data-module="vector">
+            <i class="fa-solid fa-brain"></i> Vector DB (AI)
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" data-module="monitoring">
+            <i class="fa-solid fa-terminal"></i> Monitoring
           </a>
         </li>
       </ul>
@@ -93,54 +103,113 @@
       <!-- Workflows Module -->
       <section id="workflows" class="module-section">
         <div class="header-action">
-          <h2>n8n Workflows</h2>
-          <button class="btn-primary" id="refresh-workflows">Refresh List</button>
+          <h2>Workflow Management</h2>
+          <button class="btn-primary" id="open-add-workflow"><i class="fa-solid fa-plus"></i> New Workflow</button>
         </div>
         <div class="wf-grid" id="workflow-list-container">
-          <!-- Mock/Dynamic list -->
+          <!-- Dynamic list -->
         </div>
       </section>
 
+      <!-- Shopify Module -->
+      <section id="shopify" class="module-section">
+        <div class="header-action">
+          <h2>Sales & Inventory</h2>
+          <button class="btn-primary" id="sync-shopify"><i class="fa-solid fa-rotate"></i> Sync Shopify</button>
+        </div>
+        <div class="grid-2-1">
+          <div class="card-large">
+            <h3 style="margin-bottom: 1rem;">Recent Orders</h3>
+            <div id="shopify-orders-list">
+              <p class="empty-msg">Connect Shopify API to see orders.</p>
+            </div>
+          </div>
+          <div class="stat-card">
+            <h3>Inventory Alert</h3>
+            <div id="shopify-inventory-status">
+              <p class="empty-msg">No alerts.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Monitoring Module -->
+      <section id="monitoring" class="module-section">
+        <div class="header-action">
+          <h2>AI & Error Logs</h2>
+        </div>
+        <div class="grid-2-col">
+          <div class="card-large">
+            <h3>Recent Conversations</h3>
+            <div id="conversation-summary" class="log-container"></div>
+          </div>
+          <div class="card-large">
+            <h3>Workflow Errors</h3>
+            <div id="error-logs" class="log-container"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Vector DB Module -->
+      <section id="vector" class="module-section">
+        <div class="header-action">
+          <h2>Vector DB Training</h2>
+        </div>
+        <div class="glass-card">
+          <h3>Upload Knowledge Base</h3>
+          <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">Sube PDFs o archivos de texto para entrenar a
+            tu asistente de IA.</p>
+          <div class="upload-zone" id="drop-zone">
+            <i class="fa-solid fa-cloud-arrow-up"></i>
+            <p>Arrastra archivos o haz clic para subir</p>
+            <input type="file" id="file-upload" hidden>
+          </div>
+          <div id="upload-status" style="margin-top: 1rem;"></div>
+        </div>
+      </section>
       <!-- Settings Module -->
       <section id="settings" class="module-section">
         <div class="header-action">
-          <h2>API Connections</h2>
+          <h2>Connections</h2>
         </div>
         <div class="glass-card" style="max-width: 600px;">
-          <p style="margin-bottom: 2rem; color: var(--text-secondary);">Las llaves API se guardan localmente en tu
-            navegador. Nosotros no tenemos acceso a ellas.</p>
-
           <div class="input-group">
-            <label>n8n API URL</label>
-            <input type="text" id="n8n-url" placeholder="https://tu-n8n.com/api/v1">
+            <label>n8n API Base URL</label>
+            <input type="text" id="n8n-url">
           </div>
           <div class="input-group">
-            <label>n8n API Key</label>
-            <input type="password" id="n8n-key" placeholder="n8n_api_...">
+            <label>n8n Header/Key</label>
+            <input type="password" id="n8n-key">
           </div>
           <div class="input-group">
-            <label>Shopify Store URL</label>
-            <input type="text" id="shopify-url" placeholder="tienda.myshopify.com">
+            <label>Shopify URL</label>
+            <input type="text" id="shopify-url">
           </div>
           <div class="input-group">
             <label>Shopify Access Token</label>
-            <input type="password" id="shopify-token" placeholder="shpat_...">
+            <input type="password" id="shopify-token">
           </div>
-
-          <button class="btn-primary" id="save-settings">Save Connections</button>
+          <div class="input-group">
+            <label>OpenAI API Key (Vector DB)</label>
+            <input type="password" id="openai-key">
+          </div>
+          <button class="btn-primary" id="save-settings">Save All Connections</button>
         </div>
       </section>
-
-      <!-- Placeholder Modules -->
-      <section id="shopify" class="module-section">
-        <h2>Shopify Management</h2>
-        <p>Connect Shopify API in settings to manage your shop.</p>
-      </section>
-      <section id="clients" class="module-section">
-        <h2>Clients Database</h2>
-        <p>Academic database management module coming soon.</p>
-      </section>
     </main>
+
+    <!-- Global Modal -->
+    <div id="modal-container" class="modal-overlay">
+      <div class="modal-content glass-card">
+        <div class="modal-header">
+          <h3 id="modal-title">Action</h3>
+          <button class="close-modal">&times;</button>
+        </div>
+        <div id="modal-body">
+          <!-- Dynamically filled -->
+        </div>
+      </div>
+    </div>
   </div>
   <script type="module" src="./src/main.js"></script>
 </body>
