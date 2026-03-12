@@ -413,7 +413,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // --- INIT ---
   const loadInitialSettings = () => {
-    if (settings.n8nUrl) document.getElementById('n8n-url').value = settings.n8nUrl;
+    const defaultN8nUrl = 'https://lash-academy-agentes-n8n.ed2taz.easypanel.host';
+
+    if (settings.n8nUrl) {
+      document.getElementById('n8n-url').value = settings.n8nUrl;
+    } else {
+      document.getElementById('n8n-url').value = defaultN8nUrl;
+      settings.n8nUrl = defaultN8nUrl;
+    }
     if (settings.n8nKey) document.getElementById('n8n-key').value = settings.n8nKey;
     if (settings.shopifyUrl) document.getElementById('shopify-url').value = settings.shopifyUrl;
     if (settings.shopifyToken) document.getElementById('shopify-token').value = settings.shopifyToken;
