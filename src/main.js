@@ -40,7 +40,9 @@ document.addEventListener('DOMContentLoaded', () => {
       n8nKey: document.getElementById('n8n-key').value,
       shopifyUrl: document.getElementById('shopify-url').value,
       shopifyToken: document.getElementById('shopify-token').value,
-      openaiKey: document.getElementById('openai-key').value
+      openaiKey: document.getElementById('openai-key').value,
+      supabaseUrl: document.getElementById('supabase-url').value,
+      supabaseKey: document.getElementById('supabase-key').value
     };
     localStorage.setItem('lash_academy_settings', JSON.stringify(settings));
     alert('Configuración guardada!');
@@ -145,15 +147,91 @@ document.addEventListener('DOMContentLoaded', () => {
   dropZone.addEventListener('click', () => fileInput.click());
   fileInput.addEventListener('change', (e) => handleUpload(e.target.files[0]));
 
-  const handleUpload = (file) => {
+  const handleUpload = async (file) => {
     if (!file) return;
     const status = document.getElementById('upload-status');
-    status.innerHTML = `<div class="log-entry success">Procesando ${file.name}...</div>`;
+    status.innerHTML = `<div class="log-entry">Leyendo archivo ${file.name}...</div>`;
 
-    // Simulación de OpenAI Embedding
-    setTimeout(() => {
-      status.innerHTML += `<div class="log-entry success">Vectores generados y guardados en la base de datos para ${file.name}.</div>`;
-    }, 2000);
+    if (!settings.openaiKey || !settings.supabaseUrl || !settings.supabaseKey) {
+      status.innerHTML += `<div class="log-entry error">Faltan credenciales de OpenAI o Supabase en Settings.</div>`;
+      return;
+    }
+
+    try {
+      const text = await file.text();
+      // Simple chunking (split by paragraphs)
+      const chunks = text.split('\n\n').filter(c => c.trim().length > 10);
+      status.innerHTML += `<div class="log-entry">Generando vectores para ${chunks.length} fragmentos...</div>`;
+
+      for (let i = 0; i < chunks.length; i++) {
+        const chunkContent = chunks[i].trim();
+
+        // 1. OpenAI Embedding (text-embedding-3-small)
+        const openAiRes = await fetch('https://api.openai.com/v1/embeddings', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${settings.openaiKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            input: chunkContent,
+            model: "text-embedding-3-small"
+          })
+        });
+
+        if (!openAiRes.ok) throw new Error('Error al conectar con OpenAI');
+        const openAiData = await openAiRes.json();
+        const embedding = openAiData.data[0].embedding;
+
+        // 2. Supabase Insert (Supabase requires a table with a vector column, e.g., 'documents' table with 'content' and 'embedding')
+        const supaRes = await fetch(`${settings.supabaseUrl}/rest/v1/documents`, {
+          method: 'POST',
+          headers: {
+            'apikey': settings.supabaseKey,
+            'Authorization': `Bearer ${settings.supabaseKey}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=minimal'
+          },
+          body: JSON.stringify({
+            content: chunkContent,
+            embedding: embedding,
+            metadata: { source: file.name, chunk_id: i }
+          })
+        });
+
+        if (!supaRes.ok) throw new Error(`Error al guardar en Supabase (Chunk ${i})`);
+      }
+
+      status.innerHTML += `<div class="log-entry success"><i class="fa-solid fa-check"></i> ${chunks.length} vectores guardados exitosamente en Supabase.</div>`;
+      addLog('Vectorización', `Se han procesado ${chunks.length} fragmentos de ${file.name}`, 'success');
+
+    } catch (error) {
+      console.error(error);
+      status.innerHTML += `<div class="log-entry error">Aviso: ${error.message}. (Asegúrate de que la tabla 'documents' existe en Supabase).</div>`;
+      addLog('Error Vector', error.message, 'error');
+    }
+  };
+
+  const addLog = (type, msg, status) => {
+    const errorContainer = document.getElementById('error-logs');
+    const entry = document.createElement('div');
+    entry.className = `log-entry ${status}`;
+    entry.innerHTML = `<b>[${type}]</b> ${new Date().toLocaleTimeString()} - ${msg}`;
+    errorContainer.prepend(entry);
+  };
+
+  // Mock Conversations
+  const renderConversations = () => {
+    const container = document.getElementById('conversation-summary');
+    const mocks = [
+      { user: "Juan P.", summary: "Interesado en curso de pestañas para Mayo." },
+      { user: "María G.", summary: "Problema con el acceso al curso online." }
+    ];
+    container.innerHTML = mocks.map(m => `
+        <div class="log-entry">
+            <b>${m.user}:</b> ${m.summary}
+        </div>
+    `).join('');
   };
 
   // --- INIT ---
@@ -163,8 +241,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (settings.shopifyUrl) document.getElementById('shopify-url').value = settings.shopifyUrl;
     if (settings.shopifyToken) document.getElementById('shopify-token').value = settings.shopifyToken;
     if (settings.openaiKey) document.getElementById('openai-key').value = settings.openaiKey;
+    if (settings.supabaseUrl) document.getElementById('supabase-url').value = settings.supabaseUrl;
+    if (settings.supabaseKey) document.getElementById('supabase-key').value = settings.supabaseKey;
     updateStatus();
     renderWorkflows();
+    renderConversations();
   };
 
   loadInitialSettings();
