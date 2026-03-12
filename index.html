@@ -50,8 +50,8 @@
           </a>
         </li>
         <li class="nav-item">
-          <a class="nav-link" data-module="monitoring">
-            <i class="fa-solid fa-terminal"></i> Monitoring
+          <a class="nav-link" data-module="comm">
+            <i class="fa-solid fa-comments"></i> Comm Hub
           </a>
         </li>
       </ul>
@@ -156,18 +156,30 @@
         </div>
       </section>
 
-      <!-- Monitoring Module -->
-      <section id="monitoring" class="module-section">
+      <!-- Comm Hub Module (Replacing Monitoring with a more interactive one) -->
+      <section id="comm" class="module-section">
         <div class="header-action">
-          <h2>AI & Error Logs</h2>
+          <h2>Communication Hub</h2>
+          <div class="status-indicator">
+            <i class="fa-solid fa-bolt"></i> n8n Interactive
+          </div>
         </div>
-        <div class="grid-2-col">
-          <div class="card-large">
-            <h3>Recent Conversations</h3>
-            <div id="conversation-summary" class="log-container"></div>
+        <div class="grid-2-1">
+          <div class="glass-card chat-container">
+            <div id="chat-messages" class="chat-box">
+              <div class="chat-msg system">Dashboard: Sistema listo. Selecciona un workflow para iniciar el chat.</div>
+            </div>
+            <div class="chat-input-area">
+              <select id="chat-workflow-select" class="chat-select">
+                <option value="">Seleccionar Workflow...</option>
+                <!-- Workflows with webhooks will appear here -->
+              </select>
+              <input type="text" id="chat-input" placeholder="Escribe un mensaje para n8n...">
+              <button id="send-chat" class="btn-primary"><i class="fa-solid fa-paper-plane"></i></button>
+            </div>
           </div>
           <div class="card-large">
-            <h3>Workflow Errors</h3>
+            <h3>Recent Activity</h3>
             <div id="error-logs" class="log-container"></div>
           </div>
         </div>
@@ -223,6 +235,10 @@
           <div class="input-group">
             <label>Supabase Anon Key</label>
             <input type="password" id="supabase-key" placeholder="eyJhbGciOiJIUzI1NiI...">
+          </div>
+          <div class="input-group">
+            <label>PDF Monkey API Key</label>
+            <input type="password" id="pdfmonkey-key" placeholder="pm_...">
           </div>
           <button class="btn-primary" id="save-settings">Save All Connections</button>
         </div>
