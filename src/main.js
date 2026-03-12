@@ -4,6 +4,9 @@ document.addEventListener('DOMContentLoaded', () => {
   let students = JSON.parse(localStorage.getItem('lash_students') || '[]');
   let settings = JSON.parse(localStorage.getItem('lash_academy_settings') || '{}');
 
+  // Hardcoded API Key provided by user for convenience (if not in settings yet)
+  const PROVIDED_N8N_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzYzk3MmE4Zi1jMWI3LTQwMDEtYTM3OC0zNTQ5ZTEyNmMzZDEiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwianRpIjoiYmUxMTBkOWUtNmZiZi00NGVkLWEzYWUtYWMwYTM3OGE1NGE4IiwiaWF0IjoxNzczMzE4Mjc4fQ.SWoFVnUlwqLp04pViVk7-LToSNaIq7fhvfyP7w-c9Pg";
+
   // --- NAVIGATION ---
   const navLinks = document.querySelectorAll('.nav-link');
   const sections = document.querySelectorAll('.module-section');
@@ -76,7 +79,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const updateStatus = () => {
     const indicator = document.getElementById('global-status');
-    const isConn = settings.shopifyToken && settings.n8nKey && settings.openaiKey && settings.pdfMonkeyKey;
+    const isConn = (settings.n8nKey || PROVIDED_N8N_KEY) && settings.shopifyToken;
     indicator.innerHTML = isConn ? '<span class="dot"></span> Connected' : '<span class="dot" style="background:#666"></span> Partial Setup';
     indicator.style.color = isConn ? '#4CAF50' : '#FF9800';
   };
@@ -89,12 +92,73 @@ document.addEventListener('DOMContentLoaded', () => {
     if (wfCount) wfCount.textContent = workflows.filter(w => w.status).length;
   };
 
+  // --- N8N API SYNC ---
+  const syncN8n = async () => {
+    const syncBtn = document.getElementById('sync-n8n');
+    const icon = syncBtn.querySelector('i');
+    const n8nUrl = settings.n8nUrl || 'https://n8n.tu-dominio.com'; // User needs this
+    const n8nKey = settings.n8nKey || PROVIDED_N8N_KEY;
+
+    if (!n8nKey) {
+      alert('Por favor, añade tu API Key de n8n en Settings.');
+      return;
+    }
+
+    icon.classList.add('fa-spin-custom');
+    syncBtn.disabled = true;
+
+    try {
+      // Fetching from n8n Public API
+      // Note: This requires Public API enabled on n8n and CORS allowed.
+      const response = await fetch(`${n8nUrl.replace(/\/$/, '')}/api/v1/workflows`, {
+        headers: {
+          'X-N8N-API-KEY': n8nKey
+        }
+      });
+
+      if (!response.ok) throw new Error('Error al conectar con la API de n8n. Verifica la URL y la Key.');
+
+      const data = await response.json();
+      const n8nWorkflows = data.data.map(w => ({
+        id: w.id,
+        name: w.name,
+        status: w.active,
+        url: `${n8nUrl}/workflow/${w.id}` // Link to UI
+      }));
+
+      // Merge or overwrite? Let's merge by ID
+      n8nWorkflows.forEach(nw => {
+        const existingIdx = workflows.findIndex(w => w.id === nw.id);
+        if (existingIdx >= 0) {
+          workflows[existingIdx] = nw;
+        } else {
+          workflows.push(nw);
+        }
+      });
+
+      localStorage.setItem('lash_workflows', JSON.stringify(workflows));
+      renderWorkflows();
+      addLog('n8n Sync', `Sincronizados ${n8nWorkflows.length} workflows correctamente.`, 'success');
+      alert(`¡Sincronización completada! ${n8nWorkflows.length} flujos importados.`);
+    } catch (e) {
+      console.error(e);
+      addLog('n8n Error', e.message, 'error');
+      alert(`Error de sincronización: ${e.message}\n\nNota: Asegúrate de tener activada la variable N8N_CORS_ALLOWED_ORIGINS=* en tu servidor n8n.`);
+    } finally {
+      icon.classList.remove('fa-spin-custom');
+      syncBtn.disabled = false;
+    }
+  };
+
+  const syncN8nBtn = document.getElementById('sync-n8n');
+  if (syncN8nBtn) syncN8nBtn.addEventListener('click', syncN8n);
+
   // --- WORKFLOW CRUD ---
   const renderWorkflows = () => {
     const container = document.getElementById('workflow-list-container');
     if (!container) return;
     if (workflows.length === 0) {
-      container.innerHTML = '<p class="empty-msg">No hay workflows. Crea uno nuevo.</p>';
+      container.innerHTML = '<p class="empty-msg">No hay workflows. Pulsa "Sync n8n" o crea uno manual.</p>';
       return;
     }
     container.innerHTML = workflows.map(wf => `
@@ -102,6 +166,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <div class="wf-info">
           <h4>${wf.name}</h4>
           <p>${wf.status ? 'Activo' : 'Pausado'}</p>
+          <small style="color:var(--text-secondary); opacity:0.6">${wf.id}</small>
         </div>
         <div style="display:flex; align-items:center; gap:15px;">
           <button class="btn-icon" onclick="deleteWorkflow('${wf.id}')"><i class="fa-solid fa-trash"></i></button>
@@ -122,22 +187,42 @@ document.addEventListener('DOMContentLoaded', () => {
     renderWorkflows();
   };
 
-  window.toggleWorkflow = (id) => {
+  window.toggleWorkflow = async (id) => {
     const wf = workflows.find(w => w.id === id);
-    if (wf) wf.status = !wf.status;
+    if (!wf) return;
+
+    const n8nUrl = settings.n8nUrl || 'https://n8n.tu-dominio.com';
+    const n8nKey = settings.n8nKey || PROVIDED_N8N_KEY;
+
+    // Local toggle first for feedback
+    wf.status = !wf.status;
     localStorage.setItem('lash_workflows', JSON.stringify(workflows));
     renderWorkflows();
+
+    // API toggle attempt
+    if (n8nKey && n8nUrl) {
+      try {
+        const action = wf.status ? 'activate' : 'deactivate';
+        await fetch(`${n8nUrl.replace(/\/$/, '')}/api/v1/workflows/${wf.id}/${action}`, {
+          method: 'POST',
+          headers: { 'X-N8N-API-KEY': n8nKey }
+        });
+        addLog('n8n Toggle', `Workflow ${wf.name} ${wf.status ? 'activado' : 'pausado'}.`, 'success');
+      } catch (e) {
+        addLog('n8n Toggle Error', `No se pudo sincronizar el cambio con n8n: ${e.message}`, 'error');
+      }
+    }
   };
 
   const addWfBtn = document.getElementById('open-add-workflow');
   if (addWfBtn) addWfBtn.addEventListener('click', () => {
-    openModal('Añadir Workflow', `
+    openModal('Añadir Workflow Manual', `
       <div class="input-group">
         <label>Nombre</label>
         <input type="text" id="new-wf-name" placeholder="Ej: Facturas WhatsApp">
       </div>
       <div class="input-group">
-        <label>Webhook URL (n8n)</label>
+        <label>Webhook URL (para Chat Hub)</label>
         <input type="text" id="new-wf-url" placeholder="https://tu-n8n.com/webhook/...">
       </div>
       <button class="btn-primary" onclick="saveNewWorkflow()">Guardar Workflow</button>
@@ -148,7 +233,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const name = document.getElementById('new-wf-name').value;
     const url = document.getElementById('new-wf-url').value;
     if (!name || !url) return;
-    workflows.push({ id: Date.now().toString(), name, url, status: true });
+    workflows.push({ id: `manual-${Date.now()}`, name, url, status: true });
     localStorage.setItem('lash_workflows', JSON.stringify(workflows));
     closeModal();
     renderWorkflows();
@@ -219,12 +304,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const updateChatSelect = () => {
     if (!chatSelect) return;
-    const activeWebhooks = workflows.filter(w => w.status);
+    const activeWebhooks = workflows.filter(w => w.status && w.url && w.url.includes('webhook'));
     chatSelect.innerHTML = '<option value="">Seleccionar Workflow...</option>' +
       activeWebhooks.map(w => `<option value="${w.url}">${w.name}</option>`).join('');
   };
 
   const addChatMessage = (role, text) => {
+    if (!chatMessages) return;
     const msg = document.createElement('div');
     msg.className = `chat-msg ${role}`;
     msg.textContent = text;
@@ -249,10 +335,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (res.ok) {
         const data = await res.json();
-        // n8n should return { response: "..." }
         const reply = data.response || data.output || 'Workflow activado correctamente.';
         addChatMessage('n8n', reply);
-        addLog('Webhook', `Respuesta de n8n recibida: ${webhookUrl}`, 'success');
+        addLog('Webhook', `Mensaje enviado al workflow.`, 'success');
       } else {
         throw new Error('No se pudo conectar con el webhook de n8n.');
       }
@@ -336,6 +421,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (settings.supabaseUrl) document.getElementById('supabase-url').value = settings.supabaseUrl;
     if (settings.supabaseKey) document.getElementById('supabase-key').value = settings.supabaseKey;
     if (settings.pdfMonkeyKey) document.getElementById('pdfmonkey-key').value = settings.pdfMonkeyKey;
+
+    // Auto-fill provided key if empty
+    if (!settings.n8nKey && PROVIDED_N8N_KEY) {
+      document.getElementById('n8n-key').value = PROVIDED_N8N_KEY;
+    }
 
     updateStatus();
     updateOverviewStats();
