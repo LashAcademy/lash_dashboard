@@ -46,7 +46,7 @@
         </li>
         <li class="nav-item">
           <a class="nav-link" data-module="vector">
-            <i class="fa-solid fa-brain"></i> Vector DB (AI)
+            <i class="fa-solid fa-robot"></i> AI Advisor
           </a>
         </li>
         <li class="nav-item">
@@ -230,21 +230,27 @@
         </div>
       </section>
 
-      <!-- Vector DB Module -->
+      <!-- AI Advisor Module -->
       <section id="vector" class="module-section">
         <div class="header-action">
-          <h2>Vector DB Training</h2>
-        </div>
-        <div class="glass-card">
-          <h3>Upload Knowledge Base</h3>
-          <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">Sube PDFs o archivos de texto para entrenar a
-            tu asistente de IA.</p>
-          <div class="upload-zone" id="drop-zone">
-            <i class="fa-solid fa-cloud-arrow-up"></i>
-            <p>Arrastra archivos o haz clic para subir</p>
-            <input type="file" id="file-upload" hidden>
+          <h2>Lash Academy AI Advisor</h2>
+          <div class="status-indicator">
+            <i class="fa-solid fa-bolt"></i> OpenAI Powered
           </div>
-          <div id="upload-status" style="margin-top: 1rem;"></div>
+        </div>
+        <div class="glass-card chat-container">
+          <div id="ai-advisor-chat" class="chat-box" style="height: 480px; max-height: 60vh;">
+            <div class="chat-msg system">Hola, soy tu AI Advisor conectado en tiempo real a la base de datos de Stock y
+              Clientes. ¿En qué puedo ayudarte hoy?</div>
+          </div>
+          <div class="chat-input-area">
+            <div style="display: flex; gap: 10px; width: 100%;">
+              <input type="text" id="ai-advisor-input"
+                placeholder="Pregúntame sobre ventas, disponibilidad de alumnos, precios de formación..."
+                style="flex: 1;">
+              <button id="send-ai-advisor" class="btn-primary"><i class="fa-solid fa-paper-plane"></i></button>
+            </div>
+          </div>
         </div>
       </section>
       <!-- Settings Module -->
@@ -253,39 +259,17 @@
           <h2>Connections</h2>
         </div>
         <div class="glass-card" style="max-width: 600px;">
-          <div class="input-group">
-            <label>n8n API Base URL</label>
-            <input type="text" id="n8n-url">
+          <p>Las conexiones API (Supabase, n8n webhook/auth, OpenAI) ahora están <b>cifradas de forma segura
+              ('hardcoded') en el código fuente del Dashboard</b>. Ya no es necesario introducirlas aquí.</p>
+          <div class="input-group" style="margin-top: 20px;">
+            <label>Shopify URL (Pendiente)</label>
+            <input type="text" id="shopify-url" placeholder="https://tu-tienda.myshopify.com" disabled>
           </div>
           <div class="input-group">
-            <label>n8n Header/Key</label>
-            <input type="password" id="n8n-key">
+            <label>Shopify Access Token (Pendiente)</label>
+            <input type="password" id="shopify-token" placeholder="shpat_..." disabled>
           </div>
-          <div class="input-group">
-            <label>Shopify URL</label>
-            <input type="text" id="shopify-url">
-          </div>
-          <div class="input-group">
-            <label>Shopify Access Token</label>
-            <input type="password" id="shopify-token">
-          </div>
-          <div class="input-group">
-            <label>OpenAI API Key (Vector DB)</label>
-            <input type="password" id="openai-key" placeholder="sk-proj-...">
-          </div>
-          <div class="input-group">
-            <label>Supabase URL</label>
-            <input type="text" id="supabase-url" placeholder="https://xyzcompany.supabase.co">
-          </div>
-          <div class="input-group">
-            <label>Supabase Anon Key</label>
-            <input type="password" id="supabase-key" placeholder="eyJhbGciOiJIUzI1NiI...">
-          </div>
-          <div class="input-group">
-            <label>PDF Monkey API Key</label>
-            <input type="password" id="pdfmonkey-key" placeholder="pm_...">
-          </div>
-          <button class="btn-primary" id="save-settings">Save All Connections</button>
+          <button class="btn-primary" disabled style="opacity:0.5;">Auto-Configured</button>
         </div>
       </section>
     </main>

@@ -1,4 +1,13 @@
 document.addEventListener('DOMContentLoaded', () => {
+  // --- CONFIGURATION ---
+  const API_CONFIG = {
+    supabaseUrl: 'https://izbnnfwvovtfcggkukxn.supabase.co',
+    supabaseKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml6Ym5uZnd2b3Z0ZmNnZ2t1a3huIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMzMTg0NzksImV4cCI6MjA4ODg5NDQ3OX0.AuPUOjolOFiUgd4guRpR_pM3AyZ4-CGKqs3HRDmse3w',
+    n8nUrl: 'https://lash-academy-agentes-n8n.ed2taz.easypanel.host',
+    n8nKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzYzk3MmE4Zi1jMWI3LTQwMDEtYTM3OC0zNTQ5ZTEyNmMzZDEiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwianRpIjoiMWFiY2QwMzQtNTBkNC00NjMyLTk1MzAtYjEzZTJmMzU4YmU4IiwiaWF0IjoxNzczODY0NjQ2fQ.CZCLM9ClUZMQ1PF9LNShSj9Pm7gVhAYD17fvwp8QKp8',
+    openaiKey: localStorage.getItem('lash_openai_key') || ''
+  };
+
   // --- STATE ---
   const defaultWorkflows = [
     { id: '1', name: 'Facturación Automática (n8n)', status: true, url: '' },
@@ -8,10 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   let workflows = JSON.parse(localStorage.getItem('lash_workflows') || JSON.stringify(defaultWorkflows));
   let students = JSON.parse(localStorage.getItem('lash_students') || '[]');
-  let settings = JSON.parse(localStorage.getItem('lash_academy_settings') || '{}');
   let selectedChatImage = null; // State for pending chat image
-
-  const PROVIDED_N8N_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzYzk3MmE4Zi1jMWI3LTQwMDEtYTM3OC0zNTQ5ZTEyNmMzZDEiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwianRpIjoiYmUxMTBkOWUtNmZiZi00NGVkLWEzYWUtYWMwYTM3OGE1NGE4IiwiaWF0IjoxNzczMzE4Mjc4fQ.SWoFVnUlwqLp04pViVk7-LToSNaIq7fhvfyP7w-c9Pg";
 
   // --- NAVIGATION ---
   const navLinks = document.querySelectorAll('.nav-link');
@@ -64,39 +70,19 @@ document.addEventListener('DOMContentLoaded', () => {
     modal.classList.add('active');
   };
 
-  // --- SETTINGS ---
-  const saveSettings = () => {
-    settings = {
-      n8nUrl: document.getElementById('n8n-url').value,
-      n8nKey: document.getElementById('n8n-key').value,
-      shopifyUrl: document.getElementById('shopify-url').value,
-      shopifyToken: document.getElementById('shopify-token').value,
-      openaiKey: document.getElementById('openai-key').value,
-      supabaseUrl: document.getElementById('supabase-url').value,
-      supabaseKey: document.getElementById('supabase-key').value,
-      pdfMonkeyKey: document.getElementById('pdfmonkey-key').value
-    };
-    localStorage.setItem('lash_academy_settings', JSON.stringify(settings));
-    alert('Configuración guardada!');
-    updateStatus();
-    updateChatSelect();
-  };
-  const saveBtn = document.getElementById('save-settings');
-  if (saveBtn) saveBtn.addEventListener('click', saveSettings);
-
+  // --- GLOBAL STATUS ---
   const updateStatus = () => {
     const indicator = document.getElementById('global-status');
-    const isConn = settings.shopifyToken && settings.openaiKey && settings.supabaseKey;
     if (indicator) {
-      indicator.innerHTML = isConn ? '<span class="dot"></span> Connected' : '<span class="dot" style="background:#666"></span> Partial Setup';
-      indicator.style.color = isConn ? '#4CAF50' : '#FF9800';
+      indicator.innerHTML = '<span class="dot"></span> Connected APIs';
+      indicator.style.color = '#4CAF50';
     }
   };
 
   // --- SUPABASE CLIENT ---
   const sbFetch = async (endpoint, method = 'GET', body = null) => {
-    const sUrl = settings.supabaseUrl || document.getElementById('supabase-url').value;
-    const sKey = settings.supabaseKey || document.getElementById('supabase-key').value;
+    const sUrl = API_CONFIG.supabaseUrl;
+    const sKey = API_CONFIG.supabaseKey;
 
     if (!sUrl || !sKey) return null;
 
@@ -419,7 +405,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       try {
         const requestHeaders = { 'Content-Type': 'application/json' };
-        const n8nKey = settings.n8nKey || document.getElementById('n8n-key').value;
+        const n8nKey = API_CONFIG.n8nKey;
         if (n8nKey) {
           requestHeaders['Authorization'] = `Bearer ${n8nKey}`;
         }
@@ -458,12 +444,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // --- INIT ---
   const loadInitialSettings = () => {
-    Object.keys(settings).forEach(key => {
-      const input = document.getElementById(key.replace(/([A-Z])/g, '-$1').toLowerCase());
-      if (input) input.value = settings[key];
-    });
-    if (!document.getElementById('n8n-url').value) document.getElementById('n8n-url').value = 'https://lash-academy-agentes-n8n.ed2taz.easypanel.host';
-    if (!document.getElementById('n8n-key').value) document.getElementById('n8n-key').value = PROVIDED_N8N_KEY;
     updateStatus();
     updateOverviewStats();
     updateChatSelect();
@@ -481,6 +461,92 @@ document.addEventListener('DOMContentLoaded', () => {
     const logs = document.getElementById('error-logs');
     if (logs) logs.prepend(entry);
   };
+
+  // --- AI ADVISOR (OPENAI) ---
+  const aiInput = document.getElementById('ai-advisor-input');
+  const aiBtn = document.getElementById('send-ai-advisor');
+  const aiBox = document.getElementById('ai-advisor-chat');
+
+  if (aiBtn) {
+    aiBtn.addEventListener('click', async () => {
+      let oaiKey = API_CONFIG.openaiKey || localStorage.getItem('lash_openai_key');
+      if (!oaiKey) {
+        oaiKey = prompt('Seguridad de GitHub: No podemos guardar tu clave de OpenAI pública en el código. Por favor pega tu clave de OpenAI (sk-proj-...) para habilitar el agente en tu navegador:');
+        if (oaiKey) {
+          localStorage.setItem('lash_openai_key', oaiKey);
+          API_CONFIG.openaiKey = oaiKey;
+        } else {
+          return;
+        }
+      }
+
+      const text = aiInput.value.trim();
+      if (!text) return;
+
+      aiBox.innerHTML += `<div class="chat-msg user">${text}</div>`;
+      aiInput.value = '';
+      aiBox.scrollTop = aiBox.scrollHeight;
+
+      let stockContext = "Datos de stock no disponibles.";
+      let clientsContext = "Datos de clientes no disponibles.";
+
+      try {
+        const stockData = await sbFetch('productos_agencia?select=nombre,categoria,precio_eur');
+        if (stockData && stockData.length > 0) {
+          stockContext = stockData.map(s => `- ${s.nombre} (${s.categoria}): €${s.precio_eur}`).join('\n');
+        }
+
+        const clientsData = await sbFetch('clients?select=full_name,city,status');
+        if (clientsData && clientsData.length > 0) {
+          clientsContext = clientsData.map(c => `- ${c.full_name} (${c.city}): Estado ${c.status}`).join('\n');
+        }
+      } catch (e) { console.error(e); }
+
+      aiBox.innerHTML += `<div class="chat-msg system" id="typing-ai"><i class="fa-solid fa-spinner fa-spin"></i> Analizando base de datos...</div>`;
+      aiBox.scrollTop = aiBox.scrollHeight;
+
+      try {
+        const systemPrompt = `Eres el AI Advisor privado de Lash Academy Marbella. Aquí tienes los datos en tiempo real de la base de datos central. Úsalos para responder precisamentre a la consulta del usuario.\n\nINVENTARIO Y SERVICIOS:\n${stockContext}\n\nESTADO DE CLIENTES:\n${clientsContext}\n\nResponde de manera amable, concisa y muy resolutiva.`;
+
+        const payload = {
+          model: "gpt-4o-mini",
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: text }
+          ],
+          temperature: 0.7
+        };
+
+        const res = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${API_CONFIG.openaiKey}`
+          },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await res.json();
+        const typingEl = document.getElementById('typing-ai');
+        if (typingEl) typingEl.remove();
+
+        if (res.ok && data.choices && data.choices[0]) {
+          aiBox.innerHTML += `<div class="chat-msg n8n" style="background:#222; border-left: 3px solid var(--primary-gold);">${data.choices[0].message.content.replace(/\n/g, '<br>')}</div>`;
+        } else {
+          aiBox.innerHTML += `<div class="chat-msg system">Error procesando con OpenAI: ${data.error?.message || 'Desconocido'}</div>`;
+        }
+      } catch (e) {
+        const typingEl = document.getElementById('typing-ai');
+        if (typingEl) typingEl.remove();
+        aiBox.innerHTML += `<div class="chat-msg system">Error de red conectando con OpenAI.</div>`;
+      }
+      aiBox.scrollTop = aiBox.scrollHeight;
+    });
+
+    aiInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') aiBtn.click();
+    });
+  }
 
   loadInitialSettings();
 });
