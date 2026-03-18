@@ -164,6 +164,33 @@ body {
   border-radius: 24px;
 }
 
+/* --- OMNIBAR AI --- */
+.omnibar-wrapper {
+  background: rgba(15, 15, 15, 0.8);
+  padding: 1rem 2rem;
+  border: 1px solid var(--primary-gold);
+  border-radius: 30px;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 2.5rem;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5), inset 0 0 10px rgba(212, 175, 55, 0.1);
+}
+
+.omnibar-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  font-size: 1rem;
+  outline: none;
+}
+
+.omnibar-input::placeholder {
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
 .btn-primary,
 .btn-secondary {
   padding: 10px 20px;

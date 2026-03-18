@@ -173,21 +173,63 @@ document.addEventListener('DOMContentLoaded', () => {
   const renderClients = async () => {
     const container = document.getElementById('client-list-container');
     if (!container) return;
-    container.innerHTML = '<tr><td colspan="5" class="empty-msg">Cargando cerebros...</td></tr>';
+    container.innerHTML = '<tr><td colspan="6" class="empty-msg">Cargando cerebros...</td></tr>';
     const data = await sbFetch('clients?select=*&order=created_at.desc');
     if (!data || data.length === 0) {
-      container.innerHTML = '<tr><td colspan="5" class="empty-msg">No hay clientes.</td></tr>';
+      container.innerHTML = '<tr><td colspan="6" class="empty-msg">No hay clientes.</td></tr>';
       return;
     }
-    container.innerHTML = data.map(c => `
+    container.innerHTML = data.map(c => {
+      const b64Data = btoa(unescape(encodeURIComponent(JSON.stringify(c))));
+      return `
       <tr>
         <td><b>${c.full_name}</b><br><small>${c.email || ''}</small></td>
         <td>${c.city || '-'}</td>
         <td>${c.phone || '-'}<br><small>IG: ${c.instagram || '-'}</small></td>
         <td><span class="badge ${c.status === 'Active' ? 'success' : 'warning'}">${c.status}</span></td>
+        <td>
+          <button class="btn-secondary" style="padding: 5px 10px; font-size: 0.8rem;" onclick="generateClientInsight('${b64Data}')">
+            <i class="fa-solid fa-bolt" style="color:var(--primary-gold)"></i> AI Predict
+          </button>
+        </td>
         <td><button class="btn-icon" onclick="deleteClient('${c.id}')"><i class="fa-solid fa-trash"></i></button></td>
       </tr>
-    `).join('');
+    `}).join('');
+  };
+
+  window.generateClientInsight = async (b64Data) => {
+    const client = JSON.parse(decodeURIComponent(escape(atob(b64Data)))); /* Base64 to Object */
+
+    let oaiKey = API_CONFIG.openaiKey || localStorage.getItem('lash_openai_key');
+    if (!oaiKey) {
+      oaiKey = prompt('Seguridad de GitHub: Inserta tu clave de OpenAI para el modo CRM Predictivo (sk-proj-...):');
+      if (oaiKey) {
+        localStorage.setItem('lash_openai_key', oaiKey);
+        API_CONFIG.openaiKey = oaiKey;
+      } else return;
+    }
+
+    openModal(`Analizando a ${client.full_name}...`, '<div style="text-align:center; padding: 2rem;"><i class="fa-solid fa-brain fa-spin fa-2x"></i><p style="margin-top:1rem; color: var(--text-secondary);">Calculando modelo predictivo estratégico (Upsell y LTV)...</p></div>');
+
+    try {
+      const stockRes = await sbFetch('productos_agencia?select=nombre,categoria,precio_eur');
+      const stockTxt = stockRes ? stockRes.map(s => `${s.nombre} (€${s.precio_eur})`).join(', ') : 'Catálogo temporalmente no disponible';
+
+      const prompt = `Analiza estratégicamente el perfil de esta clienta/alumna de Lash Academy Marbella. Historial del sistema: ${JSON.stringify(client)}. Basándote en sus datos y combinándolo de manera inteligente con nuestro catálogo actual de servicios y formaciones: [${stockTxt}], redacta un breve pitch comercial persuasivo (3 líneas de WhatsApp) sugiriéndole el próximo servicio que debería comprarnos para hacer un 'upsell'. Justifica psicologicamente por qué lo necesita. Finalmente incluye una estimación en euros de su 'Lifetime Value' (LTV) potencial. Usa tono premium.`;
+
+      const res = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${API_CONFIG.openaiKey}` },
+        body: JSON.stringify({ model: "gpt-4o-mini", messages: [{ role: "system", content: prompt }], temperature: 0.7 })
+      });
+
+      const data = await res.json();
+      if (res.ok && data.choices) {
+        openModal(`🎯 CRM Predictivo: ${client.full_name}`, `<div style="font-size:0.95rem; line-height: 1.6; color:var(--text-primary); border-left: 3px solid var(--primary-gold); padding-left: 15px; margin-bottom:20px;">${data.choices[0].message.content.replace(/\\n/g, '<br>')}</div><div style="display:flex; gap:10px;"><button class="btn-primary" onclick="window.open('https://wa.me/${client.phone || ''}?text=Hola ${encodeURIComponent(client.full_name.split(' ')[0])}')"><i class="fa-brands fa-whatsapp"></i> Hablarle por WhatsApp</button></div>`);
+      } else {
+        openModal('Error de Predicción', `<p style="color:#F44336">Error AI: ${data.error?.message || 'Rechazado'}</p>`);
+      }
+    } catch (e) { openModal('Error', '<p>Error contactando al servidor maestro AI.</p>'); }
   };
 
   const openAddClientModal = () => {
@@ -487,6 +529,59 @@ document.addEventListener('DOMContentLoaded', () => {
     updateOverviewStats();
     renderWorkflows(); // Fetch Real n8n workflows 
   };
+
+  // --- OMNIBAR AI LOGIC ---
+  const omniInput = document.getElementById('omnibar-input');
+  const omniBtn = document.getElementById('omnibar-btn');
+
+  const processOmniSearch = async () => {
+    const text = omniInput.value.trim();
+    if (!text) return;
+
+    let oaiKey = API_CONFIG.openaiKey || localStorage.getItem('lash_openai_key');
+    if (!oaiKey) {
+      oaiKey = prompt('Seguridad de GitHub: Inserta tu clave de OpenAI (sk-proj-...) para habilitar la OmniBar AI:');
+      if (oaiKey) {
+        localStorage.setItem('lash_openai_key', oaiKey);
+        API_CONFIG.openaiKey = oaiKey;
+      } else return;
+    }
+
+    omniInput.value = '';
+    openModal('OmniBar AI (Buscando...)', '<div style="text-align:center; padding: 2rem;"><i class="fa-solid fa-spinner fa-spin fa-2x"></i><p style="margin-top:1rem; color: var(--text-secondary);">Barriendo bases de datos...</p></div>');
+
+    try {
+      const stockRes = await sbFetch('productos_agencia?select=nombre,categoria,precio_eur');
+      const clientsRes = await sbFetch('clients?select=full_name,city,status');
+
+      const stockTxt = stockRes ? stockRes.map(s => `${s.nombre} (€${s.precio_eur})`).join(', ') : 'ND';
+      const clientsTxt = clientsRes ? clientsRes.map(c => `${c.full_name} (${c.status})`).join(', ') : 'ND';
+
+      const prompt = `Eres la IA Omnipotente (OmniBar) integrada en la cima del dashboard de "Lash Academy Marbella". Responde de forma ultra-directa (como un asistente de comando militar y resolutivo) a esta petición del dueño:\n\nPetición: "${text}"\n\nDatos inyectados en tiempo real:\nALMACÉN: ${stockTxt}\nALUMNOS: ${clientsTxt}`;
+
+      const res = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${API_CONFIG.openaiKey}` },
+        body: JSON.stringify({ model: "gpt-4o-mini", messages: [{ role: "system", content: prompt }], temperature: 0.2 })
+      });
+
+      const data = await res.json();
+      if (res.ok && data.choices) {
+        openModal(`🔎 Respuesta: "${text}"`, `<div style="font-size:1.05rem; line-height: 1.6; color:var(--text-primary);">${data.choices[0].message.content.replace(/\\n/g, '<br>')}</div>`);
+      } else {
+        openModal('Error de Asistente', `<p style="color:#F44336">Error: ${data.error?.message || 'Cifrado'}</p>`);
+      }
+    } catch (e) {
+      openModal('Error de Enlace', '<p>Caída temporal de la red backend.</p>');
+    }
+  };
+
+  if (omniBtn) omniBtn.addEventListener('click', processOmniSearch);
+  if (omniInput) {
+    omniInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') processOmniSearch();
+    });
+  }
 
   const syncShopify = () => {
     const salesStat = document.getElementById('stat-sales');
