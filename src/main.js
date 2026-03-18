@@ -9,15 +9,28 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   // --- STATE ---
-  const defaultWorkflows = [
-    { id: '1', name: 'Facturación Automática (n8n)', status: true, url: '' },
-    { id: '2', name: 'Sincronización Shopify-Lash', status: true, url: '' },
-    { id: '3', name: 'AI WhatsApp Assistant', status: false, url: '' }
-  ];
-
-  let workflows = JSON.parse(localStorage.getItem('lash_workflows') || JSON.stringify(defaultWorkflows));
+  let realWorkflows = [];
   let students = JSON.parse(localStorage.getItem('lash_students') || '[]');
   let selectedChatImage = null; // State for pending chat image
+
+  // --- N8N API WRAPPER ---
+  const n8nFetch = async (endpoint, method = 'GET') => {
+    const url = `${API_CONFIG.n8nUrl}/api/v1${endpoint}`;
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: {
+          'X-N8N-API-KEY': API_CONFIG.n8nKey,
+          'Accept': 'application/json'
+        }
+      });
+      if (!res.ok) return null;
+      return await res.json();
+    } catch (e) {
+      console.error('n8n API Error:', e);
+      return null;
+    }
+  };
 
   // --- NAVIGATION ---
   const navLinks = document.querySelectorAll('.nav-link');
@@ -268,71 +281,96 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   // --- WORKFLOWS logic ---
-  const renderWorkflows = () => {
+  const renderWorkflows = async () => {
     const container = document.getElementById('workflow-list-container');
     if (!container) return;
-    container.innerHTML = workflows.map(wf => `
+    container.innerHTML = '<p style="color:var(--text-secondary)">Sincronizando con n8n...</p>';
+
+    const data = await n8nFetch('/workflows?limit=50');
+    if (!data || !data.data) {
+      container.innerHTML = '<p class="empty-msg">Error conectando a la API de n8n.</p>';
+      return;
+    }
+
+    realWorkflows = data.data;
+
+    const wfCountEl = document.getElementById('stat-workflows');
+    if (wfCountEl) wfCountEl.textContent = realWorkflows.filter(w => w.active).length;
+
+    if (realWorkflows.length === 0) {
+      container.innerHTML = '<p class="empty-msg">No hay workflows en n8n.</p>';
+      return;
+    }
+
+    container.innerHTML = realWorkflows.map(wf => `
       <div class="workflow-card">
-        <div class="wf-info"><h4>${wf.name}</h4><p>${wf.status ? 'Activo' : 'Pausado'}</p></div>
+        <div class="wf-info">
+          <h4>${wf.name}</h4>
+          <p>${wf.active ? 'Activo' : 'Pausado'}</p>
+        </div>
         <div style="display:flex; align-items:center; gap:15px;">
-          <button class="btn-icon" onclick="deleteWorkflow('${wf.id}')"><i class="fa-solid fa-trash"></i></button>
-          <label class="switch"><input type="checkbox" ${wf.status ? 'checked' : ''} onchange="toggleWorkflow('${wf.id}')"><span class="slider"></span></label>
+          <button class="btn-icon" onclick="window.open('${API_CONFIG.n8nUrl}/workflow/${wf.id}', '_blank')" title="Editar en n8n"><i class="fa-solid fa-external-link"></i></button>
+          <label class="switch">
+            <input type="checkbox" ${wf.active ? 'checked' : ''} onchange="toggleWorkflow('${wf.id}', this.checked)">
+            <span class="slider"></span>
+          </label>
         </div>
       </div>
     `).join('');
-  };
 
-  window.deleteWorkflow = (id) => {
-    workflows = workflows.filter(w => w.id !== id);
-    localStorage.setItem('lash_workflows', JSON.stringify(workflows));
-    renderWorkflows();
     updateChatSelect();
   };
 
-  window.toggleWorkflow = (id) => {
-    const wf = workflows.find(w => w.id === id);
-    if (wf) wf.status = !wf.status;
-    localStorage.setItem('lash_workflows', JSON.stringify(workflows));
+  window.toggleWorkflow = async (id, isActivating) => {
+    const endpoint = `/workflows/${id}/${isActivating ? 'activate' : 'deactivate'}`;
+    await n8nFetch(endpoint, 'POST');
     renderWorkflows();
-    updateChatSelect();
   };
 
+  // BOTÓN "New Workflow"
   const addWfBtn = document.getElementById('open-add-workflow');
   if (addWfBtn) addWfBtn.addEventListener('click', () => {
-    openModal('Añadir Workflow Manual', `
-      <div class="input-group"><label>Nombre</label><input type="text" id="new-wf-name" placeholder="Ej: Chat de n8n"></div>
-      <div class="input-group"><label>Webhook URL / Chat URL</label><input type="text" id="new-wf-url" placeholder="https://..."></div>
-      <button class="btn-primary" onclick="saveNewWorkflow()">Guardar</button>
-    `);
+    window.open(`${API_CONFIG.n8nUrl}/workflow/new`, '_blank');
   });
 
   window.saveNewWorkflow = () => {
-    const name = document.getElementById('new-wf-name').value;
-    const url = document.getElementById('new-wf-url').value;
-    if (!name) return;
-    workflows.push({ id: `manual-${Date.now()}`, name, url, status: true });
-    localStorage.setItem('lash_workflows', JSON.stringify(workflows));
+    // Ya no se usa local, redirigimos a n8n
     closeModal();
-    renderWorkflows();
-    updateChatSelect();
   };
 
   // --- COMM HUB Logic ---
   const updateChatSelect = () => {
     const chatSelect = document.getElementById('chat-workflow-select');
     if (!chatSelect) return;
-    const activeWebhooks = workflows.filter(w => w.status && w.url);
-    chatSelect.innerHTML = '<option value="">Seleccionar Canal...</option>' +
-      activeWebhooks.map(w => `<option value="${w.url}">${w.name}</option>`).join('');
+
+    // Extraer URLs de webhooks dinámicos analizando los nodos de LangChain Chat
+    const chatChannels = [];
+    realWorkflows.forEach(wf => {
+      if (!wf.active || !wf.nodes) return;
+      wf.nodes.forEach(n => {
+        if (n.type === '@n8n/n8n-nodes-langchain.chatTrigger' && n.webhookId) {
+          chatChannels.push({
+            name: wf.name,
+            url: `${API_CONFIG.n8nUrl}/webhook/${n.webhookId}/chat`
+          });
+        }
+      });
+    });
+
+    const manualChannels = JSON.parse(localStorage.getItem('lash_manual_chats') || '[]');
+
+    chatSelect.innerHTML = '<option value="">Seleccionar Canal n8n Automático...</option>' +
+      chatChannels.map(w => `<option value="${w.url}">🤖 ${w.name}</option>`).join('') +
+      manualChannels.map(w => `<option value="${w.url}">💬 ${w.name} (Manual)</option>`).join('');
   };
 
   const addChatChannelBtn = document.getElementById('add-chat-channel');
   if (addChatChannelBtn) {
     addChatChannelBtn.addEventListener('click', () => {
-      openModal('Añadir Canal de Chat (n8n)', `
+      openModal('Añadir Canal Manual Externo', `
           <div class="input-group"><label>Nombre del Canal</label><input type="text" id="hub-name" placeholder="Ej: Soporte Marbella"></div>
-          <div class="input-group"><label>URL de Chat (Copia de n8n)</label><input type="text" id="hub-url" placeholder="https://.../chat"></div>
-          <button class="btn-primary" onclick="saveChatHub()">Conectar Canal</button>
+          <div class="input-group"><label>URL del Webhook (n8n u otra IA)</label><input type="text" id="hub-url" placeholder="https://.../webhook/..."></div>
+          <button class="btn-primary" onclick="saveChatHub()">Añadir Canal</button>
         `);
     });
   }
@@ -341,8 +379,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const name = document.getElementById('hub-name').value;
     const url = document.getElementById('hub-url').value;
     if (!name || !url) return;
-    workflows.push({ id: `chat-${Date.now()}`, name, url, status: true });
-    localStorage.setItem('lash_workflows', JSON.stringify(workflows));
+    const manualChannels = JSON.parse(localStorage.getItem('lash_manual_chats') || '[]');
+    manualChannels.push({ id: `chat-${Date.now()}`, name, url });
+    localStorage.setItem('lash_manual_chats', JSON.stringify(manualChannels));
     closeModal();
     updateChatSelect();
     alert('Canal añadido con éxito');
@@ -446,7 +485,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const loadInitialSettings = () => {
     updateStatus();
     updateOverviewStats();
-    updateChatSelect();
+    renderWorkflows(); // Fetch Real n8n workflows 
   };
 
   const syncShopify = () => {
