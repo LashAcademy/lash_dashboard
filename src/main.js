@@ -231,17 +231,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const container = document.getElementById('catalog-list-container');
     if (!container) return;
     container.innerHTML = '<tr><td colspan="5" class="empty-msg">Cargando catálogo...</td></tr>';
-    const data = await sbFetch('catalog?select=*&order=created_at.desc');
+    const data = await sbFetch('productos_agencia?select=*&order=id.desc');
     if (!data || data.length === 0) {
       container.innerHTML = '<tr><td colspan="5" class="empty-msg">Vaciado.</td></tr>';
       return;
     }
     container.innerHTML = data.map(v => `
       <tr>
-        <td><b>${v.name}</b></td>
-        <td>${v.type}</td>
-        <td>€${v.price}</td>
-        <td><span class="badge success">${v.status}</span></td>
+        <td><b>${v.nombre || '-'}</b></td>
+        <td>${v.categoria || '-'}</td>
+        <td>€${v.precio_eur || 0}</td>
+        <td><span class="badge success">Activo</span></td>
         <td><button class="btn-icon" onclick="deleteCatalog('${v.id}')"><i class="fa-solid fa-trash"></i></button></td>
       </tr>
     `).join('');
@@ -265,19 +265,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
   window.saveNewCatalog = async () => {
     const body = {
-      name: document.getElementById('new-v-name').value,
-      type: document.getElementById('new-v-type').value,
-      price: document.getElementById('new-v-price').value,
-      description: document.getElementById('new-v-description').value
+      nombre: document.getElementById('new-v-name').value,
+      categoria: document.getElementById('new-v-type').value,
+      precio_eur: document.getElementById('new-v-price').value,
+      marca: 'Lash Academy'
     };
-    if (!body.name) return alert('El nombre es obligatorio');
-    const res = await sbFetch('catalog', 'POST', body);
+    if (!body.nombre) return alert('El nombre es obligatorio');
+    const res = await sbFetch('productos_agencia', 'POST', body);
     if (res) { closeModal(); renderCatalog(); }
   };
 
   window.deleteCatalog = async (id) => {
     if (!confirm('¿Eliminar?')) return;
-    const res = await sbFetch(`catalog?id=eq.${id}`, 'DELETE');
+    const res = await sbFetch(`productos_agencia?id=eq.${id}`, 'DELETE');
     if (res) renderCatalog();
   };
 
