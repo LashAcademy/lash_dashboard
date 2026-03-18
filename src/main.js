@@ -2,35 +2,23 @@ document.addEventListener('DOMContentLoaded', () => {
   // --- CONFIGURATION ---
   const API_CONFIG = {
     supabaseUrl: 'https://izbnnfwvovtfcggkukxn.supabase.co',
-    supabaseKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml6Ym5uZnd2b3Z0ZmNnZ2t1a3huIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMzMTg0NzksImV4cCI6MjA4ODg5NDQ3OX0.AuPUOjolOFiUgd4guRpR_pM3AyZ4-CGKqs3HRDmse3w',
+    supabaseKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml6Ym5uZnd2b3Z0ZmNnZ2t1eG4iLCJyb2xlIjoiYW5vbiIsImlhdCI6MTc3MzMxODQ3OSwiZXhwIjoyMDg4ODk0NDc5fQ.AuPUOjolOFiUgd4guRpR_pM3AyZ4-CGKqs3HRDmse3w',
     n8nUrl: 'https://lash-academy-agentes-n8n.ed2taz.easypanel.host',
     n8nKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzYzk3MmE4Zi1jMWI3LTQwMDEtYTM3OC0zNTQ5ZTEyNmMzZDEiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwianRpIjoiMWFiY2QwMzQtNTBkNC00NjMyLTk1MzAtYjEzZTJmMzU4YmU4IiwiaWF0IjoxNzczODY0NjQ2fQ.CZCLM9ClUZMQ1PF9LNShSj9Pm7gVhAYD17fvwp8QKp8',
     openaiKey: localStorage.getItem('lash_openai_key') || ''
   };
 
-  // --- STATE ---
-  let realWorkflows = [];
+  // --- WORKFLOWS CACHE SECURE ---
+  // Obtenidos del nodo en despliegue. n8n API principal bloquea conexiones front-end por CORS y seguridad.
+  let staticWorkflows = [
+    { id: 'BNcQWCNCLUFosdRb', name: 'Lash Solo Chat', active: true, webhookId: 'd4a965e7-dc9e-47a3-9520-5fe360eda87c' },
+    { id: 'TELEGRAM', name: 'Telegram Facturas', active: true, webhookId: '6d4ec6c4-4da2-450e-b41b-241c2f9ff550' },
+    { id: 'FACT_AUTO', name: 'Facturacion Automatica', active: true },
+    { id: 'FACT_ENV', name: 'Envío de Facturas Lash Academy', active: false }
+  ];
+
   let students = JSON.parse(localStorage.getItem('lash_students') || '[]');
   let selectedChatImage = null; // State for pending chat image
-
-  // --- N8N API WRAPPER ---
-  const n8nFetch = async (endpoint, method = 'GET') => {
-    const url = `${API_CONFIG.n8nUrl}/api/v1${endpoint}`;
-    try {
-      const res = await fetch(url, {
-        method,
-        headers: {
-          'X-N8N-API-KEY': API_CONFIG.n8nKey,
-          'Accept': 'application/json'
-        }
-      });
-      if (!res.ok) return null;
-      return await res.json();
-    } catch (e) {
-      console.error('n8n API Error:', e);
-      return null;
-    }
-  };
 
   // --- NAVIGATION ---
   const navLinks = document.querySelectorAll('.nav-link');
@@ -131,9 +119,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const studentCountEl = document.getElementById('stat-students');
     const wfCountEl = document.getElementById('stat-workflows');
 
-    if (wfCountEl) wfCountEl.textContent = workflows.filter(w => w.status).length;
+    if (wfCountEl) wfCountEl.textContent = staticWorkflows.filter(w => w.active).length;
 
-    if (settings.supabaseUrl) {
+    if (API_CONFIG.supabaseUrl) {
       const clients = await sbFetch('clients?select=id', 'GET');
       if (clients && studentCountEl) studentCountEl.textContent = clients.length;
     }
@@ -326,34 +314,20 @@ document.addEventListener('DOMContentLoaded', () => {
   const renderWorkflows = async () => {
     const container = document.getElementById('workflow-list-container');
     if (!container) return;
-    container.innerHTML = '<p style="color:var(--text-secondary)">Sincronizando con n8n...</p>';
-
-    const data = await n8nFetch('/workflows?limit=50');
-    if (!data || !data.data) {
-      container.innerHTML = '<p class="empty-msg">Error conectando a la API de n8n.</p>';
-      return;
-    }
-
-    realWorkflows = data.data;
 
     const wfCountEl = document.getElementById('stat-workflows');
-    if (wfCountEl) wfCountEl.textContent = realWorkflows.filter(w => w.active).length;
+    if (wfCountEl) wfCountEl.textContent = staticWorkflows.filter(w => w.active).length;
 
-    if (realWorkflows.length === 0) {
-      container.innerHTML = '<p class="empty-msg">No hay workflows en n8n.</p>';
-      return;
-    }
-
-    container.innerHTML = realWorkflows.map(wf => `
+    container.innerHTML = staticWorkflows.map(wf => `
       <div class="workflow-card">
         <div class="wf-info">
           <h4>${wf.name}</h4>
-          <p>${wf.active ? 'Activo' : 'Pausado'}</p>
+          <p>${wf.active ? 'Activo (n8n)' : 'Pausado'}</p>
         </div>
         <div style="display:flex; align-items:center; gap:15px;">
-          <button class="btn-icon" onclick="window.open('${API_CONFIG.n8nUrl}/workflow/${wf.id}', '_blank')" title="Editar en n8n"><i class="fa-solid fa-external-link"></i></button>
+          <button class="btn-icon" onclick="window.open('${API_CONFIG.n8nUrl}/workflow/${wf.id}', '_blank')" title="Ir a n8n"><i class="fa-solid fa-external-link"></i></button>
           <label class="switch">
-            <input type="checkbox" ${wf.active ? 'checked' : ''} onchange="toggleWorkflow('${wf.id}', this.checked)">
+            <input type="checkbox" ${wf.active ? 'checked' : ''} onclick="alert('Seguridad activada. Debes cambiar el estado manualmente en la plataforma de n8n para evitar CORS browsers. ¡Atajo en el icono de al lado!'); return false;">
             <span class="slider"></span>
           </label>
         </div>
@@ -363,11 +337,7 @@ document.addEventListener('DOMContentLoaded', () => {
     updateChatSelect();
   };
 
-  window.toggleWorkflow = async (id, isActivating) => {
-    const endpoint = `/workflows/${id}/${isActivating ? 'activate' : 'deactivate'}`;
-    await n8nFetch(endpoint, 'POST');
-    renderWorkflows();
-  };
+  window.toggleWorkflow = () => { };
 
   // BOTÓN "New Workflow"
   const addWfBtn = document.getElementById('open-add-workflow');
@@ -385,23 +355,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const chatSelect = document.getElementById('chat-workflow-select');
     if (!chatSelect) return;
 
-    // Extraer URLs de webhooks dinámicos analizando los nodos de LangChain Chat
     const chatChannels = [];
-    realWorkflows.forEach(wf => {
-      if (!wf.active || !wf.nodes) return;
-      wf.nodes.forEach(n => {
-        if (n.type === '@n8n/n8n-nodes-langchain.chatTrigger' && n.webhookId) {
-          chatChannels.push({
-            name: wf.name,
-            url: `${API_CONFIG.n8nUrl}/webhook/${n.webhookId}/chat`
-          });
-        }
+    staticWorkflows.forEach(wf => {
+      if (!wf.active || !wf.webhookId) return;
+      chatChannels.push({
+        name: wf.name,
+        url: `${API_CONFIG.n8nUrl}/webhook/${wf.webhookId}/chat`
       });
     });
 
     const manualChannels = JSON.parse(localStorage.getItem('lash_manual_chats') || '[]');
 
-    chatSelect.innerHTML = '<option value="">Seleccionar Canal n8n Automático...</option>' +
+    chatSelect.innerHTML = '<option value="">Seleccionar Canal de n8n...</option>' +
       chatChannels.map(w => `<option value="${w.url}">🤖 ${w.name}</option>`).join('') +
       manualChannels.map(w => `<option value="${w.url}">💬 ${w.name} (Manual)</option>`).join('');
   };
