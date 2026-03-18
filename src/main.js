@@ -95,20 +95,30 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // --- SUPABASE CLIENT ---
   const sbFetch = async (endpoint, method = 'GET', body = null) => {
-    if (!settings.supabaseUrl || !settings.supabaseKey) return null;
-    const url = `${settings.supabaseUrl}/rest/v1/${endpoint}`;
+    const sUrl = settings.supabaseUrl || document.getElementById('supabase-url').value;
+    const sKey = settings.supabaseKey || document.getElementById('supabase-key').value;
+
+    if (!sUrl || !sKey) return null;
+
+    const baseUrl = sUrl.replace(/\/$/, "");
+    const url = `${baseUrl}/rest/v1/${endpoint}`;
+
     const headers = {
-      'apikey': settings.supabaseKey,
-      'Authorization': `Bearer ${settings.supabaseKey}`,
-      'Content-Type': 'application/json',
-      'Prefer': method === 'POST' ? 'return=representation' : ''
+      'apikey': sKey,
+      'Authorization': `Bearer ${sKey}`,
+      'Content-Type': 'application/json'
     };
+    if (method === 'POST') headers['Prefer'] = 'return=representation';
+
     const options = { method, headers };
     if (body) options.body = JSON.stringify(body);
 
     try {
       const res = await fetch(url, options);
-      if (!res.ok) throw new Error(res.statusText);
+      if (!res.ok) {
+        const errText = await res.text().catch(() => '');
+        throw new Error(`${res.status} ${res.statusText} - ${errText}`);
+      }
       return res.status === 204 ? true : await res.json();
     } catch (e) {
       console.error('Supabase Error:', e);
@@ -408,9 +418,15 @@ document.addEventListener('DOMContentLoaded', () => {
       chatBox.scrollTop = chatBox.scrollHeight;
 
       try {
+        const requestHeaders = { 'Content-Type': 'application/json' };
+        const n8nKey = settings.n8nKey || document.getElementById('n8n-key').value;
+        if (n8nKey) {
+          requestHeaders['Authorization'] = `Bearer ${n8nKey}`;
+        }
+
         const res = await fetch(url, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: requestHeaders,
           body: JSON.stringify({
             chatInput: currentMsg,
             message: currentMsg,
@@ -426,6 +442,9 @@ document.addEventListener('DOMContentLoaded', () => {
           aiMsg.textContent = data.output || data.response || data.text || (typeof data === 'string' ? data : 'Mensaje enviado.');
           chatBox.appendChild(aiMsg);
           chatBox.scrollTop = chatBox.scrollHeight;
+        } else {
+          const errText = await res.text().catch(() => '');
+          throw new Error(`HTTP ${res.status}: ${errText}`);
         }
       } catch (e) {
         console.error('Chat error:', e);
