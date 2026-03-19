@@ -2,7 +2,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // --- CONFIGURATION ---
   const API_CONFIG = {
     supabaseUrl: 'https://izbnnfwvovtfcggkukxn.supabase.co',
-    supabaseKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml6Ym5uZnd2b3Z0ZmNnZ2t1eG4iLCJyb2xlIjoiYW5vbiIsImlhdCI6MTc3MzMxODQ3OSwiZXhwIjoyMDg4ODk0NDc5fQ.AuPUOjolOFiUgd4guRpR_pM3AyZ4-CGKqs3HRDmse3w',
+    supabaseKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml6Ym5uZnd2b3Z0ZmNnZ2t1a3huIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMzMTg0NzksImV4cCI6MjA4ODg5NDQ3OX0.AuPUOjolOFiUgd4guRpR_pM3AyZ4-CGKqs3HRDmse3w',
     n8nUrl: 'https://lash-academy-agentes-n8n.ed2taz.easypanel.host',
     n8nKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzYzk3MmE4Zi1jMWI3LTQwMDEtYTM3OC0zNTQ5ZTEyNmMzZDEiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwianRpIjoiMWFiY2QwMzQtNTBkNC00NjMyLTk1MzAtYjEzZTJmMzU4YmU4IiwiaWF0IjoxNzczODY0NjQ2fQ.CZCLM9ClUZMQ1PF9LNShSj9Pm7gVhAYD17fvwp8QKp8',
     openaiKey: localStorage.getItem('lash_openai_key') || ''
